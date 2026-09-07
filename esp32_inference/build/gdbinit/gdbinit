@@ -1,0 +1,2 @@
+source /home/jonny/Desktop/Code/CloudComputing/pothole_ml/esp32_inference/build/gdbinit/symbols
+source /home/jonny/Desktop/Code/CloudComputing/pothole_ml/esp32_inference/build/gdbinit/connect

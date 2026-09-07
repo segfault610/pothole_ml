@@ -1,0 +1,7 @@
+"-specs=/home/jonny/Desktop/Code/CloudComputing/pothole_ml/esp32_collector/build/bootloader/specs/picolibc.specs"
+-Wno-frame-address
+-mlongcalls
+-fno-builtin-memcpy
+-fno-builtin-memset
+-fno-builtin-bzero
+-fno-rtti

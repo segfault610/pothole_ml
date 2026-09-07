@@ -1,0 +1,596 @@
+Command: /home/jonny/.espressif/python_env/idf6.1_py3.13_env/bin/python /home/jonny/esp-idf/tools/idf_monitor.py -p /dev/ttyUSB0 -b 115200 --toolchain-prefix xtensa-esp32-elf- --target esp32 --revision 0 /home/jonny/Desktop/Code/CloudComputing/pothole_ml/esp32_inference/build/pothole_inference.elf /home/jonny/Desktop/Code/CloudComputing/pothole_ml/esp32_inference/build/bootloader/bootloader.elf -m '/home/jonny/.espressif/python_env/idf6.1_py3.13_env/bin/python' '/home/jonny/esp-idf/tools/idf.py'
+le for dynamic allocation:
+[0;32mI (227) heap_init: At 3FFAE6E0 len 00001920 (6 KiB): DRAM[0m
+I (232ets Jul 29 2019 12:21:46
+
+rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+configsip: 0, SPIWP:0xee
+clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+mode:DIO, clock div:2
+load:0x3fff0040,len:6272
+load:0x40078000,len:15848
+load:0x40080400,len:3920
+entry 0x40080644
+[0;32mI (27) boot: ESP-IDF v6.1-dev-3863-g338f341110-dirty 2nd stage bootloader[0m
+[0;32mI (27) boot: compile time Sep  4 2026 12:18:04[0m
+[0;32mI (28) boot: Multicore bootloader[0m
+[0;32mI (31) boot: chip revision: v3.1[0m
+[0;32mI (34) boot.esp32: SPI Speed      : 40MHz[0m
+[0;32mI (37) boot.esp32: SPI Mode       : DIO[0m
+[0;32mI (41) boot.esp32: SPI Flash Size : 2MB[0m
+[0;32mI (45) boot: Enabling RNG early entropy source...[0m
+[0;32mI (49) boot: Partition Table:[0m
+[0;32mI (52) boot: ## Label            Usage          Type ST Offset   Length[0m
+[0;32mI (58) boot:  0 nvs              WiFi data        01 02 00009000 00006000[0m
+[0;32mI (65) boot:  1 phy_init         RF data          01 01 0000f000 00001000[0m
+[0;32mI (71) boot:  2 factory          factory app      00 00 00010000 00100000[0m
+[0;32mI (78) boot: End of partition table[0m
+[0;32mI (81) esp_image: segment 0: paddr=00010020 vaddr=3f400020 size=0a5e8h ( 42472) map[0m
+[0;32mI (103) esp_image: segment 1: paddr=0001a610 vaddr=3ffb0000 size=02aach ( 10924) load[0m
+[0;32mI (108) esp_image: segment 2: paddr=0001d0c4 vaddr=40080000 size=02f54h ( 12116) load[0m
+[0;32mI (113) esp_image: segment 3: paddr=00020020 vaddr=400d0020 size=10e9ch ( 69276) map[0m
+[0;32mI (140) esp_image: segment 4: paddr=00030ec4 vaddr=40082f54 size=080e0h ( 32992) load[0m
+[0;32mI (153) esp_image: segment 5: paddr=00038fac vaddr=50000000 size=00028h (    40) load[0m
+[0;32mI (159) boot: Loaded app from partition at offset 0x10000[0m
+[0;32mI (159) boot: Disabling RNG early entropy source...[0m
+[0;32mI (171) cpu_start: Multicore app[0m
+[0;32mI (180) cpu_start: GPIO 3 and 1 are used as console UART I/O pins[0m
+[0;32mI (180) cpu_start: Pro cpu start user code[0m
+[0;32mI (180) cpu_start: cpu freq: 160000000 Hz[0m
+[0;32mI (182) app_init: Application information:[0m
+[0;32mI (186) app_init: Project name:     pothole_inference[0m
+[0;32mI (190) app_init: App version:      1[0m
+[0;32mI (194) app_init: Compile time:     Sep  4 2026 12:17:58[0m
+[0;32mI (199) app_init: ELF file SHA256:  4559cf044...[0m
+[0;32mI (203) app_init: ESP-IDF:          v6.1-dev-3863-g338f341110-dirty[0m
+[0;32mI (209) efuse_init: Min chip rev:     v0.0[0m
+[0;32mI (213) efuse_init: Max chip rev:     v3.99 [0m
+[0;32mI (217) efuse_init: Chip rev:         v3.1[0m
+[0;32mI (221) heap_init: Initializing. RAM available for dynamic allocation:[0m
+[0;32mI (227) heap_init: At 3FFAE6E0 len 00001920 (6 KiB): DRAM[0m
+[0;32mI (232) heap_init: At 3FFB3480 len 0002CB80 (178 KiB): DRAM[0m
+[0;32mI (237) heap_init: At 3FFE0440 len 00003AE0 (14 KiB): D/IRAM[0m
+[0;32mI (243) heap_init: At 3FFE4350 len 0001BCB0 (111 KiB): D/IRAM[0m
+[0;32mI (248) heap_init: At 4008B034 len 00014FCC (83 KiB): IRAM[0m
+[0;32mI (255) spi_flash: detected chip: generic[0m
+[0;32mI (257) spi_flash: flash io: dio[0m
+[0;33mW (260) spi_flash: Detected size(4096k) larger than the size in the binary image header(2048k). Using the size in the binary image header.[0m
+[0;32mI (274) main_task: Started on CPU0[0m
+[0;32mI (284) main_task: Calling app_main()[0m
+
+========================================
+      ESP32 POTHOLE ML INFERENCE
+========================================
+
+Inference runs completely on ESP32.
+No laptop is required during inference.
+
+ADXL345 DEVID = 0xE5
+ADXL345 initialized.
+
+========================================
+         INFERENCE READY
+========================================
+
+Sample rate : 100 Hz
+Window      : 100 samples
+Duration    : 1.0 seconds
+
+
+========================================
+       READY FOR NEXT WINDOW
+========================================
+
+Choose one physical event:
+  NORMAL ROAD
+  SPEED HUMP
+  POTHOLE
+
+Starting in 3...
+2...
+1...
+
+>>> RECORDING 1 SECOND <<<
+>>> WINDOW COMPLETE <<<
+
+FEATURES
+----------------------------------------
+x_mean    = 0.0846
+x_std     = 0.0037
+x_min     = 0.0663
+x_max     = 0.0975
+y_mean    = 0.0524
+y_std     = 0.0035
+y_min     = 0.0429
+y_max     = 0.0624
+z_mean    = 0.8730
+z_std     = 0.0042
+z_min     = 0.8658
+z_max     = 0.8892
+mag_mean  = 0.8786
+mag_std   = 0.0042
+mag_min   = 0.8711
+mag_max   = 0.8936
+mag_rms   = 0.8787
+mag_range = 0.0224
+----------------------------------------
+
+========================================
+        ESP32 CLASSIFICATION
+========================================
+
+RESULT: NORMAL
+
+========================================
+
+========================================
+       READY FOR NEXT WINDOW
+========================================
+
+Choose one physical event:
+  NORMAL ROAD
+  SPEED HUMP
+  POTHOLE
+
+Starting in 3...
+2...
+1...
+
+>>> RECORDING 1 SECOND <<<
+>>> WINDOW COMPLETE <<<
+
+FEATURES
+----------------------------------------
+x_mean    = 0.0845
+x_std     = 0.0045
+x_min     = 0.0663
+x_max     = 0.0936
+y_mean    = 0.0523
+y_std     = 0.0057
+y_min     = 0.0312
+y_max     = 0.0663
+z_mean    = 0.8727
+z_std     = 0.0048
+z_min     = 0.8502
+z_max     = 0.8814
+mag_mean  = 0.8783
+mag_std   = 0.0047
+mag_min   = 0.8559
+mag_max   = 0.8876
+mag_rms   = 0.8783
+mag_range = 0.0317
+----------------------------------------
+
+========================================
+        ESP32 CLASSIFICATION
+========================================
+
+RESULT: NORMAL
+
+========================================
+
+========================================
+       READY FOR NEXT WINDOW
+========================================
+
+Choose one physical event:
+  NORMAL ROAD
+  SPEED HUMP
+  POTHOLE
+
+Starting in 3...
+2...
+1...
+
+>>> RECORDING 1 SECOND <<<
+>>> WINDOW COMPLETE <<<
+
+FEATURES
+----------------------------------------
+x_mean    = 0.0861
+x_std     = 0.0341
+x_min     = 0.0234
+x_max     = 0.1677
+y_mean    = 0.0532
+y_std     = 0.0310
+y_min     = -0.0039
+y_max     = 0.1131
+z_mean    = 0.8740
+z_std     = 0.0138
+z_min     = 0.8463
+z_max     = 0.9126
+mag_mean  = 0.8810
+mag_std   = 0.0153
+mag_min   = 0.8539
+mag_max   = 0.9206
+mag_rms   = 0.8811
+mag_range = 0.0667
+----------------------------------------
+
+========================================
+        ESP32 CLASSIFICATION
+========================================
+
+RESULT: NORMAL
+
+========================================
+
+========================================
+       READY FOR NEXT WINDOW
+========================================
+
+Choose one physical event:
+  NORMAL ROAD
+  SPEED HUMP
+  POTHOLE
+
+Starting in 3...
+2...
+1...
+
+>>> RECORDING 1 SECOND <<<
+>>> WINDOW COMPLETE <<<
+
+FEATURES
+----------------------------------------
+x_mean    = 0.0858
+x_std     = 0.0355
+x_min     = 0.0234
+x_max     = 0.1638
+y_mean    = 0.0515
+y_std     = 0.0417
+y_min     = -0.0312
+y_max     = 0.1443
+z_mean    = 0.8746
+z_std     = 0.0177
+z_min     = 0.8346
+z_max     = 0.9711
+mag_mean  = 0.8820
+mag_std   = 0.0196
+mag_min   = 0.8403
+mag_max   = 0.9782
+mag_rms   = 0.8822
+mag_range = 0.1379
+----------------------------------------
+
+========================================
+        ESP32 CLASSIFICATION
+========================================
+
+RESULT: POTHOLE
+
+========================================
+
+========================================
+       READY FOR NEXT WINDOW
+========================================
+
+Choose one physical event:
+  NORMAL ROAD
+  SPEED HUMP
+  POTHOLE
+
+Starting in 3...
+2...
+1...
+
+>>> RECORDING 1 SECOND <<<
+>>> WINDOW COMPLETE <<<
+
+FEATURES
+----------------------------------------
+x_mean    = 0.0844
+x_std     = 0.0278
+x_min     = 0.0351
+x_max     = 0.1326
+y_mean    = 0.0534
+y_std     = 0.0492
+y_min     = -0.0234
+y_max     = 0.1404
+z_mean    = 0.8727
+z_std     = 0.0104
+z_min     = 0.8541
+z_max     = 0.8970
+mag_mean  = 0.8802
+mag_std   = 0.0120
+mag_min   = 0.8574
+mag_max   = 0.9051
+mag_rms   = 0.8803
+mag_range = 0.0478
+----------------------------------------
+
+========================================
+        ESP32 CLASSIFICATION
+========================================
+
+RESULT: POTHOLE
+
+========================================
+
+========================================
+       READY FOR NEXT WINDOW
+========================================
+
+Choose one physical event:
+  NORMAL ROAD
+  SPEED HUMP
+  POTHOLE
+
+Starting in 3...
+2...
+1...
+
+>>> RECORDING 1 SECOND <<<
+>>> WINDOW COMPLETE <<<
+
+FEATURES
+----------------------------------------
+x_mean    = 0.0847
+x_std     = 0.0036
+x_min     = 0.0741
+x_max     = 0.1014
+y_mean    = 0.0565
+y_std     = 0.0043
+y_min     = 0.0390
+y_max     = 0.0663
+z_mean    = 0.8734
+z_std     = 0.0052
+z_min     = 0.8541
+z_max     = 0.8853
+mag_mean  = 0.8794
+mag_std   = 0.0052
+mag_min   = 0.8596
+mag_max   = 0.8913
+mag_rms   = 0.8794
+mag_range = 0.0316
+----------------------------------------
+
+========================================
+        ESP32 CLASSIFICATION
+========================================
+
+RESULT: NORMAL
+
+========================================
+
+========================================
+       READY FOR NEXT WINDOW
+========================================
+
+Choose one physical event:
+  NORMAL ROAD
+  SPEED HUMP
+  POTHOLE
+
+Starting in 3...
+2...
+1...
+
+>>> RECORDING 1 SECOND <<<
+>>> WINDOW COMPLETE <<<
+
+FEATURES
+----------------------------------------
+x_mean    = 0.0848
+x_std     = 0.0037
+x_min     = 0.0741
+x_max     = 0.0975
+y_mean    = 0.0562
+y_std     = 0.0035
+y_min     = 0.0468
+y_max     = 0.0624
+z_mean    = 0.8721
+z_std     = 0.0042
+z_min     = 0.8619
+z_max     = 0.8853
+mag_mean  = 0.8780
+mag_std   = 0.0041
+mag_min   = 0.8673
+mag_max   = 0.8913
+mag_rms   = 0.8780
+mag_range = 0.0240
+----------------------------------------
+
+========================================
+        ESP32 CLASSIFICATION
+========================================
+
+RESULT: NORMAL
+
+========================================
+
+========================================
+       READY FOR NEXT WINDOW
+========================================
+
+Choose one physical event:
+  NORMAL ROAD
+  SPEED HUMP
+  POTHOLE
+
+Starting in 3...
+2...
+1...
+
+>>> RECORDING 1 SECOND <<<
+>>> WINDOW COMPLETE <<<
+
+FEATURES
+----------------------------------------
+x_mean    = 0.1816
+x_std     = 0.1300
+x_min     = -0.1872
+x_max     = 0.3939
+y_mean    = 0.0448
+y_std     = 0.1201
+y_min     = -0.3198
+y_max     = 0.5265
+z_mean    = 0.8144
+z_std     = 0.1873
+z_min     = 0.4056
+z_max     = 1.5327
+mag_mean  = 0.8560
+mag_std   = 0.1785
+mag_min   = 0.4613
+mag_max   = 1.5578
+mag_rms   = 0.8744
+mag_range = 1.0965
+----------------------------------------
+
+========================================
+        ESP32 CLASSIFICATION
+========================================
+
+RESULT: POTHOLE
+
+========================================
+
+========================================
+       READY FOR NEXT WINDOW
+========================================
+
+Choose one physical event:
+  NORMAL ROAD
+  SPEED HUMP
+  POTHOLE
+
+Starting in 3...
+2...
+1...
+
+>>> RECORDING 1 SECOND <<<
+>>> WINDOW COMPLETE <<<
+
+FEATURES
+----------------------------------------
+x_mean    = 0.1330
+x_std     = 0.1142
+x_min     = -0.2106
+x_max     = 0.3705
+y_mean    = 0.0956
+y_std     = 0.2344
+y_min     = -0.4680
+y_max     = 0.8814
+z_mean    = 0.7176
+z_std     = 0.7312
+z_min     = -0.2808
+z_max     = 2.9484
+mag_mean  = 0.8554
+mag_std   = 0.6425
+mag_min   = 0.1856
+mag_max   = 3.0715
+mag_rms   = 1.0698
+mag_range = 2.8860
+----------------------------------------
+
+========================================
+        ESP32 CLASSIFICATION
+========================================
+
+RESULT: POTHOLE
+
+========================================
+
+========================================
+       READY FOR NEXT WINDOW
+========================================
+
+Choose one physical event:
+  NORMAL ROAD
+  SPEED HUMP
+  POTHOLE
+
+Starting in 3...
+2...
+1...
+
+>>> RECORDING 1 SECOND <<<
+>>> WINDOW COMPLETE <<<
+
+FEATURES
+----------------------------------------
+x_mean    = 0.0445
+x_std     = 0.2760
+x_min     = -1.1349
+x_max     = 0.7137
+y_mean    = 0.0993
+y_std     = 0.2728
+y_min     = -0.5109
+y_max     = 1.4547
+z_mean    = 0.7582
+z_std     = 0.9212
+z_min     = -0.5187
+z_max     = 3.8649
+mag_mean  = 0.9989
+mag_std   = 0.7668
+mag_min   = 0.1394
+mag_max   = 4.2827
+mag_rms   = 1.2593
+mag_range = 4.1433
+----------------------------------------
+
+========================================
+        ESP32 CLASSIFICATION
+========================================
+
+RESULT: POTHOLE
+
+========================================
+
+========================================
+       READY FOR NEXT WINDOW
+========================================
+
+Choose one physical event:
+  NORMAL ROAD
+  SPEED HUMP
+  POTHOLE
+
+Starting in 3...
+2...
+1...
+
+>>> RECORDING 1 SECOND <<<
+>>> WINDOW COMPLETE <<<
+
+FEATURES
+----------------------------------------
+x_mean    = 0.0894
+x_std     = 0.1145
+x_min     = -0.2028
+x_max     = 0.2925
+y_mean    = 0.0396
+y_std     = 0.2271
+y_min     = -0.5928
+y_max     = 0.3705
+z_mean    = 0.6019
+z_std     = 0.8483
+z_min     = -1.0491
+z_max     = 2.1918
+mag_mean  = 0.9708
+mag_std   = 0.4622
+mag_min   = 0.1558
+mag_max   = 2.1950
+mag_rms   = 1.0752
+mag_range = 2.0393
+----------------------------------------
+
+========================================
+        ESP32 CLASSIFICATION
+========================================
+
+RESULT: POTHOLE
+
+========================================
+
+========================================
+       READY FOR NEXT WINDOW
+========================================
+
+Choose one physical event:
+  NORMAL ROAD
+  SPEED HUMP
+  POTHOLE
+
+Starting in 3...
+2...

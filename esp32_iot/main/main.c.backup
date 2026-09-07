@@ -1,0 +1,505 @@
+#include <stdio.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <string.h>
+#include <math.h>
+
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/event_groups.h"
+
+#include "esp_system.h"
+#include "esp_wifi.h"
+#include "esp_event.h"
+#include "esp_log.h"
+#include "esp_err.h"
+#include "esp_timer.h"
+#include "nvs_flash.h"
+
+#include "driver/i2c_master.h"
+#include "mqtt_client.h"
+
+#include "pothole_model.h"
+
+/* ============================================================
+ * CONFIGURATION & CONSTANTS
+ * ============================================================ */
+
+#define WIFI_SSID           "jonnys_ideapad"
+#define WIFI_PASS           "Jona2jef"
+
+#define AWS_IOT_ENDPOINT    "a30vszghfx8s3o-ats.iot.ap-south-1.amazonaws.com"
+#define AWS_IOT_TOPIC       "pothole/alerts"
+
+#define I2C_PORT            I2C_NUM_0
+#define I2C_SDA             21
+#define I2C_SCL             22
+
+#define ADXL345_ADDR        0x53
+#define REG_DEVID           0x00
+#define REG_BW_RATE         0x2C
+#define REG_POWER_CTL       0x2D
+#define REG_DATA_FORMAT     0x31
+#define REG_DATAX0          0x32
+#define EXPECTED_DEVID      0xE5
+
+#define SAMPLE_RATE_HZ      100
+#define SAMPLE_PERIOD_MS    10
+#define WINDOW_SAMPLES      100
+#define NUM_FEATURES        18
+
+static const char *TAG = "POTHOLE_IOT";
+
+/* Certificate pointers embedded via CMake */
+extern const uint8_t aws_root_ca_pem_start[]   asm("_binary_aws_root_ca_pem_start");
+extern const uint8_t aws_root_ca_pem_end[]     asm("_binary_aws_root_ca_pem_end");
+extern const uint8_t certificate_pem_crt_start[] asm("_binary_certificate_pem_crt_start");
+extern const uint8_t certificate_pem_crt_end[]   asm("_binary_certificate_pem_crt_end");
+extern const uint8_t private_pem_key_start[]   asm("_binary_private_pem_key_start");
+extern const uint8_t private_pem_key_end[]     asm("_binary_private_pem_key_end");
+
+static EventGroupHandle_t wifi_event_group;
+#define WIFI_CONNECTED_BIT BIT0
+
+static esp_mqtt_client_handle_t mqtt_client = NULL;
+static bool mqtt_connected = false;
+
+static i2c_master_bus_handle_t bus_handle;
+static i2c_master_dev_handle_t adxl_handle;
+
+/* ============================================================
+ * WIFI & MQTT HANDLERS
+ * ============================================================ */
+
+static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
+	if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
+		esp_wifi_connect();
+	} else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+		esp_wifi_connect();
+		xEventGroupClearBits(wifi_event_group, WIFI_CONNECTED_BIT);
+	} else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+		xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
+	}
+}
+
+static void wifi_init_sta(void) {
+	wifi_event_group = xEventGroupCreate();
+	ESP_ERROR_CHECK(esp_netif_init());
+	ESP_ERROR_CHECK(esp_event_loop_create_default());
+	esp_netif_create_default_wifi_sta();
+
+	wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+	ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+
+	esp_event_handler_instance_t instance_any_id;
+	esp_event_handler_instance_t instance_got_ip;
+	ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL, &instance_any_id));
+	ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_event_handler, NULL, &instance_got_ip));
+
+	wifi_config_t wifi_config = {
+		.sta = {
+			.ssid = WIFI_SSID,
+			.password = WIFI_PASS,
+		},
+	};
+	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+	ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
+	ESP_ERROR_CHECK(esp_wifi_start());
+
+	ESP_LOGI(TAG, "Connecting to Wi-Fi SSID: %s", WIFI_SSID);
+	xEventGroupWaitBits(wifi_event_group, WIFI_CONNECTED_BIT, pdFALSE, pdTRUE, portMAX_DELAY);
+	ESP_LOGI(TAG, "Connected to Wi-Fi");
+}
+
+static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data) {
+	esp_mqtt_event_handle_t event = event_data;
+	switch ((esp_mqtt_event_id_t)event_id) {
+		case MQTT_EVENT_CONNECTED:
+			ESP_LOGI(TAG, "MQTT Connected to AWS IoT!");
+			mqtt_connected = true;
+			break;
+		case MQTT_EVENT_DISCONNECTED:
+			ESP_LOGW(TAG, "MQTT Disconnected");
+			mqtt_connected = false;
+			break;
+		default:
+			break;
+	}
+}
+
+static void aws_iot_init(void) {
+	const esp_mqtt_client_config_t mqtt_cfg = {
+		.broker = {
+			.address.uri = "mqtts://" AWS_IOT_ENDPOINT ":8883",
+			.verification.certificate = (const char *)aws_root_ca_pem_start,
+		},
+		.credentials = {
+			.authentication = {
+				.certificate = (const char *)certificate_pem_crt_start,
+				.key = (const char *)private_pem_key_start,
+			},
+		},
+	};
+
+	mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
+	esp_mqtt_client_register_event(mqtt_client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
+	esp_mqtt_client_start(mqtt_client);
+}
+
+/* ============================================================
+ * ADXL345 HARDWARE DRIVER
+ * ============================================================ */
+
+static esp_err_t adxl_write_reg(uint8_t reg, uint8_t value) {
+	uint8_t data[2] = {reg, value};
+	return i2c_master_transmit(adxl_handle, data, sizeof(data), 1000);
+}
+
+static esp_err_t adxl_read_regs(uint8_t reg, uint8_t *data, size_t len) {
+	return i2c_master_transmit_receive(adxl_handle, &reg, 1, data, len, 1000);
+}
+
+static esp_err_t adxl_init(void) {
+	uint8_t devid = 0;
+	esp_err_t ret = adxl_read_regs(REG_DEVID, &devid, 1);
+	if (ret != ESP_OK || devid != EXPECTED_DEVID) return ESP_FAIL;
+
+	ESP_ERROR_CHECK(adxl_write_reg(REG_DATA_FORMAT, 0x09));
+	ESP_ERROR_CHECK(adxl_write_reg(REG_BW_RATE, 0x0A));
+	ESP_ERROR_CHECK(adxl_write_reg(REG_POWER_CTL, 0x08));
+	return ESP_OK;
+}
+
+static esp_err_t adxl_read_accel(float *x, float *y, float *z) {
+	uint8_t data[6];
+	esp_err_t ret = adxl_read_regs(REG_DATAX0, data, sizeof(data));
+	if (ret != ESP_OK) return ret;
+
+	int16_t raw_x = (int16_t)(((uint16_t)data[1] << 8) | data[0]);
+	int16_t raw_y = (int16_t)(((uint16_t)data[3] << 8) | data[2]);
+	int16_t raw_z = (int16_t)(((uint16_t)data[5] << 8) | data[4]);
+
+	*x = raw_x * 0.0039f;
+	*y = raw_y * 0.0039f;
+	*z = raw_z * 0.0039f;
+	return ESP_OK;
+}
+
+static void i2c_init(void) {
+	i2c_master_bus_config_t bus_config = {
+		.i2c_port = I2C_PORT,
+		.sda_io_num = I2C_SDA,
+		.scl_io_num = I2C_SCL,
+		.clk_source = I2C_CLK_SRC_DEFAULT,
+		.glitch_ignore_cnt = 7,
+		.flags.enable_internal_pullup = true
+	};
+	ESP_ERROR_CHECK(i2c_new_master_bus(&bus_config, &bus_handle));
+
+	i2c_device_config_t device_config = {
+		.dev_addr_length = I2C_ADDR_BIT_LEN_7,
+		.device_address = ADXL345_ADDR,
+		.scl_speed_hz = 400000
+	};
+	ESP_ERROR_CHECK(i2c_master_bus_add_device(bus_handle, &device_config, &adxl_handle));
+}
+
+/* ============================================================
+ * FEATURE EXTRACTION
+ * ============================================================ */
+
+/*
+   static void extract_features(const float *x, const float *y, const float *z, float *f) {
+   float magnitude[WINDOW_SAMPLES];
+   float x_sum = 0, y_sum = 0, z_sum = 0, mag_sum = 0, mag_sq_sum = 0;
+
+
+ *   for (int i = 0; i < WINDOW_SAMPLES; i++) {
+ *   magnitude[i] = sqrtf(x[i] * x[i] + y[i] * y[i] + z[i] * z[i]);
+ *   x_sum += x[i]; y_sum += y[i]; z_sum += z[i];
+ *   mag_sum += magnitude[i];
+ *   mag_sq_sum += magnitude[i] * magnitude[i];
+ *   }
+
+ for (int i = 1; i < WINDOW_SAMPLES; i++) {
+ if (x[i] < x_min) {
+ x_min = x[i];
+ }
+
+ if (x[i] > x_max) {
+ x_max = x[i];
+ }
+
+ if (y[i] < y_min) {
+ y_min = y[i];
+ }
+
+ if (y[i] > y_max) {
+ y_max = y[i];
+ }
+
+ if (z[i] < z_min) {
+ z_min = z[i];
+ }
+
+ if (z[i] > z_max) {
+ z_max = z[i];
+ }
+
+ if (magnitude[i] < mag_min) {
+ mag_min = magnitude[i];
+ }
+
+ if (magnitude[i] > mag_max) {
+ mag_max = magnitude[i];
+ }
+ }
+ float x_mean = x_sum / WINDOW_SAMPLES;
+ float y_mean = y_sum / WINDOW_SAMPLES;
+ float z_mean = z_sum / WINDOW_SAMPLES;
+ float mag_mean = mag_sum / WINDOW_SAMPLES;
+
+ float x_min = x[0], x_max = x[0];
+ float y_min = y[0], y_max = y[0];
+ float z_min = z[0], z_max = z[0];
+ float mag_min = magnitude[0], mag_max = magnitude[0];
+
+ for (int i = 1; i < WINDOW_SAMPLES; i++) {
+ if (x[i] < x_min) x_min = x[i]; if (x[i] > x_max) x_max = x[i];
+ if (y[i] < y_min) y_min = y[i]; if (y[i] > y_max) y_max = y[i];
+ if (z[i] < z_min) z_min = z[i]; if (z[i] > z_max) z_max = z[i];
+ if (magnitude[i] < mag_min) mag_min = magnitude[i]; if (magnitude[i] > mag_max) mag_max = magnitude[i];
+ }
+
+ float x_var = 0, y_var = 0, z_var = 0, mag_var = 0;
+ for (int i = 0; i < WINDOW_SAMPLES; i++) {
+ x_var += (x[i] - x_mean) * (x[i] - x_mean);
+ y_var += (y[i] - y_mean) * (y[i] - y_mean);
+ z_var += (z[i] - z_mean) * (z[i] - z_mean);
+ mag_var += (magnitude[i] - mag_mean) * (magnitude[i] - mag_mean);
+ }
+
+f[0]  = x_mean;                   f[1]  = sqrtf(x_var / WINDOW_SAMPLES);
+f[2]  = x_min;                    f[3]  = x_max;
+f[4]  = y_mean;                   f[5]  = sqrtf(y_var / WINDOW_SAMPLES);
+f[6]  = y_min;                    f[7]  = y_max;
+f[8]  = z_mean;                   f[9]  = sqrtf(z_var / WINDOW_SAMPLES);
+f[10] = z_min;                    f[11] = z_max;
+f[12] = mag_mean;                 f[13] = sqrtf(mag_var / WINDOW_SAMPLES);
+f[14] = mag_min;                  f[15] = mag_max;
+f[16] = sqrtf(mag_sq_sum / WINDOW_SAMPLES);
+f[17] = mag_max - mag_min;
+}
+*/
+
+static void extract_features(const float *x,
+		const float *y,
+		const float *z,
+		float *f)
+{
+	float magnitude[WINDOW_SAMPLES];
+
+	float x_sum = 0.0f;
+	float y_sum = 0.0f;
+	float z_sum = 0.0f;
+	float mag_sum = 0.0f;
+	float mag_sq_sum = 0.0f;
+
+	/* --------------------------------------------------------
+	 * Calculate magnitude and basic sums
+	 * -------------------------------------------------------- */
+
+	for (int i = 0; i < WINDOW_SAMPLES; i++) {
+		magnitude[i] = sqrtf(
+				x[i] * x[i] +
+				y[i] * y[i] +
+				z[i] * z[i]
+				);
+
+		x_sum += x[i];
+		y_sum += y[i];
+		z_sum += z[i];
+
+		mag_sum += magnitude[i];
+		mag_sq_sum += magnitude[i] * magnitude[i];
+	}
+
+	/* --------------------------------------------------------
+	 * Means
+	 * -------------------------------------------------------- */
+
+	float x_mean = x_sum / WINDOW_SAMPLES;
+	float y_mean = y_sum / WINDOW_SAMPLES;
+	float z_mean = z_sum / WINDOW_SAMPLES;
+	float mag_mean = mag_sum / WINDOW_SAMPLES;
+
+	/* --------------------------------------------------------
+	 * Min/max initialization
+	 * -------------------------------------------------------- */
+
+	float x_min = x[0];
+	float x_max = x[0];
+
+	float y_min = y[0];
+	float y_max = y[0];
+
+	float z_min = z[0];
+	float z_max = z[0];
+
+	float mag_min = magnitude[0];
+	float mag_max = magnitude[0];
+
+	/* --------------------------------------------------------
+	 * Min/max
+	 * -------------------------------------------------------- */
+
+	for (int i = 1; i < WINDOW_SAMPLES; i++) {
+
+		if (x[i] < x_min) {
+			x_min = x[i];
+		}
+
+		if (x[i] > x_max) {
+			x_max = x[i];
+		}
+
+		if (y[i] < y_min) {
+			y_min = y[i];
+		}
+
+		if (y[i] > y_max) {
+			y_max = y[i];
+		}
+
+		if (z[i] < z_min) {
+			z_min = z[i];
+		}
+
+		if (z[i] > z_max) {
+			z_max = z[i];
+		}
+
+		if (magnitude[i] < mag_min) {
+			mag_min = magnitude[i];
+		}
+
+		if (magnitude[i] > mag_max) {
+			mag_max = magnitude[i];
+		}
+	}
+
+	/* --------------------------------------------------------
+	 * Variance
+	 * -------------------------------------------------------- */
+
+	float x_var = 0.0f;
+	float y_var = 0.0f;
+	float z_var = 0.0f;
+	float mag_var = 0.0f;
+
+	for (int i = 0; i < WINDOW_SAMPLES; i++) {
+
+		float x_diff = x[i] - x_mean;
+		float y_diff = y[i] - y_mean;
+		float z_diff = z[i] - z_mean;
+		float mag_diff = magnitude[i] - mag_mean;
+
+		x_var += x_diff * x_diff;
+		y_var += y_diff * y_diff;
+		z_var += z_diff * z_diff;
+		mag_var += mag_diff * mag_diff;
+	}
+
+	/* --------------------------------------------------------
+	 * 18 features
+	 *
+	 * Must remain in exactly the same order as the
+	 * features used when training the decision tree.
+	 * -------------------------------------------------------- */
+
+	f[0]  = x_mean;
+	f[1]  = sqrtf(x_var / WINDOW_SAMPLES);
+	f[2]  = x_min;
+	f[3]  = x_max;
+
+	f[4]  = y_mean;
+	f[5]  = sqrtf(y_var / WINDOW_SAMPLES);
+	f[6]  = y_min;
+	f[7]  = y_max;
+
+	f[8]  = z_mean;
+	f[9]  = sqrtf(z_var / WINDOW_SAMPLES);
+	f[10] = z_min;
+	f[11] = z_max;
+
+	f[12] = mag_mean;
+	f[13] = sqrtf(mag_var / WINDOW_SAMPLES);
+	f[14] = mag_min;
+	f[15] = mag_max;
+
+	f[16] = sqrtf(mag_sq_sum / WINDOW_SAMPLES);
+	f[17] = mag_max - mag_min;
+}
+
+/* ============================================================
+ * MAIN EXECUTION
+ * ============================================================ */
+
+void app_main(void) {
+	esp_err_t ret = nvs_flash_init();
+	if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+		ESP_ERROR_CHECK(nvs_flash_erase());
+		ret = nvs_flash_init();
+	}
+	ESP_ERROR_CHECK(ret);
+
+	wifi_init_sta();
+	aws_iot_init();
+
+	i2c_init();
+	if (adxl_init() != ESP_OK) {
+		ESP_LOGE(TAG, "ADXL345 init failed");
+		return;
+	}
+
+	float x[WINDOW_SAMPLES], y[WINDOW_SAMPLES], z[WINDOW_SAMPLES];
+	float features[NUM_FEATURES];
+	int64_t next_sample = esp_timer_get_time();
+
+	while (1) {
+		for (int i = 0; i < WINDOW_SAMPLES; i++) {
+			if (adxl_read_accel(&x[i], &y[i], &z[i]) != ESP_OK) {
+				x[i] = y[i] = z[i] = 0.0f;
+			}
+			next_sample += SAMPLE_PERIOD_MS * 1000;
+			int64_t delay_us = next_sample - esp_timer_get_time();
+			if (delay_us > 0) {
+				vTaskDelay(pdMS_TO_TICKS(delay_us / 1000));
+			} else {
+				next_sample = esp_timer_get_time();
+			}
+		}
+
+		extract_features(x, y, z, features);
+		int result = pothole_predict(features);
+
+		if (result == CLASS_POTHOLE) {
+			ESP_LOGW(TAG, "POTHOLE DETECTED!");
+
+			// Mock coordinates (e.g. 12.9716° N, 79.1588° E)
+			float latitude = 12.9716f;
+			float longitude = 79.1588f;
+
+			char payload[128];
+			snprintf(payload, sizeof(payload), "{\"event\":\"POTHOLE\",\"coordinates\":[%.4f,%.4f]}", latitude, longitude);
+
+			if (mqtt_connected) {
+				int msg_id = esp_mqtt_client_publish(mqtt_client, AWS_IOT_TOPIC, payload, 0, 1, 0);
+				ESP_LOGI(TAG, "Published alert (msg_id=%d): %s", msg_id, payload);
+			} else {
+				ESP_LOGE(TAG, "AWS MQTT not connected, skipping publish");
+			}
+		}
+	}
+}
+

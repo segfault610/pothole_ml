@@ -1,0 +1,13 @@
+# Target labels
+ bootloader
+# Source files and their labels
+/home/jonny/Desktop/Code/CloudComputing/pothole_ml/esp32_collector/build/CMakeFiles/bootloader
+/home/jonny/Desktop/Code/CloudComputing/pothole_ml/esp32_collector/build/CMakeFiles/bootloader.rule
+/home/jonny/Desktop/Code/CloudComputing/pothole_ml/esp32_collector/build/CMakeFiles/bootloader-complete.rule
+/home/jonny/Desktop/Code/CloudComputing/pothole_ml/esp32_collector/build/bootloader-prefix/src/bootloader-stamp/bootloader-build.rule
+/home/jonny/Desktop/Code/CloudComputing/pothole_ml/esp32_collector/build/bootloader-prefix/src/bootloader-stamp/bootloader-configure.rule
+/home/jonny/Desktop/Code/CloudComputing/pothole_ml/esp32_collector/build/bootloader-prefix/src/bootloader-stamp/bootloader-download.rule
+/home/jonny/Desktop/Code/CloudComputing/pothole_ml/esp32_collector/build/bootloader-prefix/src/bootloader-stamp/bootloader-install.rule
+/home/jonny/Desktop/Code/CloudComputing/pothole_ml/esp32_collector/build/bootloader-prefix/src/bootloader-stamp/bootloader-mkdir.rule
+/home/jonny/Desktop/Code/CloudComputing/pothole_ml/esp32_collector/build/bootloader-prefix/src/bootloader-stamp/bootloader-patch.rule
+/home/jonny/Desktop/Code/CloudComputing/pothole_ml/esp32_collector/build/bootloader-prefix/src/bootloader-stamp/bootloader-update.rule

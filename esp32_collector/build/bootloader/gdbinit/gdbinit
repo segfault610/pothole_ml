@@ -1,0 +1,2 @@
+source /home/jonny/Desktop/Code/CloudComputing/pothole_ml/esp32_collector/build/bootloader/gdbinit/symbols
+source /home/jonny/Desktop/Code/CloudComputing/pothole_ml/esp32_collector/build/bootloader/gdbinit/connect

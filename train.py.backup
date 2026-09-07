@@ -1,0 +1,686 @@
+import os
+import pickle
+import numpy as np
+import pandas as pd
+
+from sklearn.tree import (
+        DecisionTreeClassifier,
+        export_text,
+        _tree
+        )
+
+from sklearn.model_selection import (
+        train_test_split
+        )
+
+from sklearn.metrics import (
+        accuracy_score,
+        classification_report,
+        confusion_matrix
+        )
+
+
+# ============================================================
+# CONFIGURATION
+# ============================================================
+
+DATA_DIR = "data"
+MODEL_DIR = "model"
+
+CLASSES = [
+        "normal",
+        "speed_hump",
+        "pothole"
+        ]
+
+MAX_DEPTH = 4
+
+
+os.makedirs(
+        MODEL_DIR,
+        exist_ok=True
+        )
+
+
+# ============================================================
+# FEATURE NAMES
+# ============================================================
+
+FEATURE_NAMES = [
+
+        "x_mean",
+        "x_std",
+        "x_min",
+        "x_max",
+
+        "y_mean",
+        "y_std",
+        "y_min",
+        "y_max",
+
+        "z_mean",
+        "z_std",
+        "z_min",
+        "z_max",
+
+        "mag_mean",
+        "mag_std",
+        "mag_min",
+        "mag_max",
+
+        "mag_rms",
+        "mag_range"
+        ]
+
+
+# ============================================================
+# FEATURE EXTRACTION
+# ============================================================
+
+def extract_features(
+        group
+        ):
+
+    x = group["x"].values.astype(
+            np.float32
+            )
+
+    y = group["y"].values.astype(
+            np.float32
+            )
+
+    z = group["z"].values.astype(
+            np.float32
+            )
+
+
+    magnitude = np.sqrt(
+            x * x +
+            y * y +
+            z * z
+            )
+
+
+    features = [
+
+            np.mean(x),
+            np.std(x),
+            np.min(x),
+            np.max(x),
+
+            np.mean(y),
+            np.std(y),
+            np.min(y),
+            np.max(y),
+
+            np.mean(z),
+            np.std(z),
+            np.min(z),
+            np.max(z),
+
+            np.mean(magnitude),
+            np.std(magnitude),
+            np.min(magnitude),
+            np.max(magnitude),
+
+            np.sqrt(
+                np.mean(
+                    magnitude * magnitude
+                    )
+                ),
+
+            np.max(magnitude)
+            -
+            np.min(magnitude)
+            ]
+
+
+    return np.array(
+            features,
+            dtype=np.float32
+            )
+
+
+# ============================================================
+# LOAD DATASET
+# ============================================================
+
+print()
+print("=" * 60)
+print(" POTHOLE ML TRAINING")
+print("=" * 60)
+print()
+
+
+all_features = []
+all_labels = []
+
+
+for class_name in CLASSES:
+
+    filename = os.path.join(
+            DATA_DIR,
+            f"{class_name}.csv"
+            )
+
+
+    print(
+            f"Loading {filename}..."
+            )
+
+
+    df = pd.read_csv(
+            filename
+            )
+
+
+    print(
+            f"  Samples: {len(df)}"
+            )
+
+
+    windows = df[
+            "window"
+            ].unique()
+
+
+    print(
+            f"  Windows: {len(windows)}"
+            )
+
+
+    for window_id in windows:
+
+        window = df[
+                df["window"] == window_id
+                ]
+
+
+        features = extract_features(
+                window
+                )
+
+
+        all_features.append(
+                features
+                )
+
+        all_labels.append(
+                class_name
+                )
+
+
+# ============================================================
+# CREATE MATRICES
+# ============================================================
+
+X = np.array(
+        all_features,
+        dtype=np.float32
+        )
+
+y = np.array(
+        all_labels
+        )
+
+
+print()
+print(
+        "Feature matrix:",
+        X.shape
+        )
+
+print(
+        "Labels:",
+        y.shape
+        )
+
+print()
+
+
+# ============================================================
+# DATASET SUMMARY
+# ============================================================
+
+for class_name in CLASSES:
+
+    count = np.sum(
+            y == class_name
+            )
+
+    print(
+            f"{class_name:12s}: {count} windows"
+            )
+
+
+# ============================================================
+# TRAIN / TEST SPLIT
+# ============================================================
+
+X_train, X_test, y_train, y_test = train_test_split(
+
+        X,
+        y,
+
+        test_size=0.25,
+
+        random_state=42,
+
+        stratify=y
+        )
+
+
+print()
+print(
+        f"Training windows: {len(X_train)}"
+        )
+
+print(
+        f"Testing windows : {len(X_test)}"
+        )
+
+
+# ============================================================
+# TRAIN DECISION TREE
+# ============================================================
+
+model = DecisionTreeClassifier(
+
+        max_depth=MAX_DEPTH,
+
+        random_state=42,
+
+        criterion="gini"
+        )
+
+
+model.fit(
+        X_train,
+        y_train
+        )
+
+
+# ============================================================
+# EVALUATION
+# ============================================================
+
+y_pred = model.predict(
+        X_test
+        )
+
+
+accuracy = accuracy_score(
+        y_test,
+        y_pred
+        )
+
+
+print()
+print("=" * 60)
+print(" MODEL PERFORMANCE")
+print("=" * 60)
+print()
+
+print(
+        f"Accuracy: {accuracy * 100:.2f}%"
+        )
+
+print()
+
+print(
+        classification_report(
+            y_test,
+            y_pred,
+            labels=CLASSES,
+            zero_division=0
+            )
+        )
+
+
+print(
+        "Confusion matrix:"
+        )
+
+print(
+        confusion_matrix(
+            y_test,
+            y_pred,
+            labels=CLASSES
+            )
+        )
+
+
+# ============================================================
+# DECISION TREE
+# ============================================================
+
+print()
+print("=" * 60)
+print(" DECISION TREE")
+print("=" * 60)
+print()
+
+print(
+        export_text(
+            model,
+            feature_names=FEATURE_NAMES
+            )
+        )
+
+
+# ============================================================
+# FEATURE IMPORTANCE
+# ============================================================
+
+print()
+print("=" * 60)
+print(" FEATURE IMPORTANCE")
+print("=" * 60)
+print()
+
+
+importance = model.feature_importances_
+
+
+importance_order = np.argsort(
+        importance
+        )[::-1]
+
+
+for index in importance_order:
+
+    if importance[index] > 0:
+
+        print(
+                f"{FEATURE_NAMES[index]:12s}"
+                f" : {importance[index]:.4f}"
+                )
+
+
+# ============================================================
+# SAVE PYTHON MODEL
+# ============================================================
+
+with open(
+        os.path.join(
+            MODEL_DIR,
+            "decision_tree.pkl"
+            ),
+        "wb"
+        ) as f:
+
+    pickle.dump(
+            model,
+            f
+            )
+
+
+print()
+print(
+        "Saved Python model:"
+        )
+
+print(
+        "model/decision_tree.pkl"
+        )
+
+
+# ============================================================
+# GENERATE C HEADER
+# ============================================================
+
+def generate_c_tree(
+        model,
+        feature_names
+        ):
+
+    tree = model.tree_
+
+
+    lines = []
+
+    lines.append(
+            "/*"
+            )
+
+    lines.append(
+            " * AUTO-GENERATED DECISION TREE"
+            )
+
+    lines.append(
+            " * DO NOT EDIT MANUALLY"
+            )
+
+    lines.append(
+            " */"
+            )
+
+    lines.append("")
+
+    lines.append(
+            "#ifndef POTHOLE_MODEL_H"
+            )
+
+    lines.append(
+            "#define POTHOLE_MODEL_H"
+            )
+
+    lines.append("")
+
+    lines.append(
+            "#define CLASS_NORMAL 0"
+            )
+
+    lines.append(
+            "#define CLASS_SPEED_HUMP 1"
+            )
+
+    lines.append(
+            "#define CLASS_POTHOLE 2"
+            )
+
+    lines.append("")
+
+
+    lines.append(
+            "static inline int pothole_predict("
+            )
+
+    lines.append(
+            "    const float *f"
+            )
+
+    lines.append(
+            ")"
+            )
+
+    lines.append("{")
+
+    lines.append("")
+
+
+    def recurse(node, depth):
+
+        indent = "    " * (
+                depth + 1
+                )
+
+
+        feature = tree.feature[node]
+
+        threshold = tree.threshold[node]
+
+
+        if feature != _tree.TREE_UNDEFINED:
+
+            feature_name = feature_names[
+                    feature
+                    ]
+
+
+            lines.append(
+                    f"{indent}/* {feature_name} */"
+                    )
+
+
+            lines.append(
+                    f"{indent}if (f[{feature}] <= "
+                    f"{threshold:.8f}f)"
+                    )
+
+            lines.append(
+                    f"{indent}{{"
+                    )
+
+
+            recurse(
+                    tree.children_left[node],
+                    depth + 1
+                    )
+
+
+            lines.append(
+                    f"{indent}}}"
+                    )
+
+
+            lines.append(
+                    f"{indent}else"
+                    )
+
+            lines.append(
+                    f"{indent}{{"
+                    )
+
+
+            recurse(
+                    tree.children_right[node],
+                    depth + 1
+                    )
+
+
+            lines.append(
+                    f"{indent}}}"
+                    )
+
+
+        else:
+
+            class_index = np.argmax(
+                    tree.value[node][0]
+                    )
+
+
+            class_name = model.classes_[
+                    class_index
+                    ]
+
+
+            if class_name == "normal":
+
+                result = "CLASS_NORMAL"
+
+            elif class_name == "speed_hump":
+
+                result = "CLASS_SPEED_HUMP"
+
+            else:
+
+                result = "CLASS_POTHOLE"
+
+
+            lines.append(
+                    f"{indent}return {result};"
+                    )
+
+
+    recurse(
+            0,
+            0
+            )
+
+
+    lines.append(
+            "}"
+            )
+
+    lines.append("")
+
+    lines.append(
+            "#endif"
+            )
+
+    lines.append("")
+
+
+    return "\n".join(
+            lines
+            )
+
+
+c_code = generate_c_tree(
+        model,
+        FEATURE_NAMES
+        )
+
+
+model_header = os.path.join(
+        MODEL_DIR,
+        "pothole_model.h"
+        )
+
+
+with open(
+        model_header,
+        "w"
+        ) as f:
+
+    f.write(
+            c_code
+            )
+
+
+print()
+print(
+        "Generated ESP32 model:"
+        )
+
+print(
+        model_header
+        )
+
+
+# ============================================================
+# SAVE FEATURE INFORMATION
+# ============================================================
+
+feature_file = os.path.join(
+        MODEL_DIR,
+        "features.txt"
+        )
+
+
+with open(
+        feature_file,
+        "w"
+        ) as f:
+
+    for i, name in enumerate(
+            FEATURE_NAMES
+            ):
+
+        f.write(
+                f"{i}: {name}\n"
+                )
+
+
+print(
+        "Saved:",
+        feature_file
+        )
+
+
+print()
+print("=" * 60)
+print(" TRAINING COMPLETE")
+print("=" * 60)
