@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 
+#include "driver/gpio.h"
 #include "driver/i2c_master.h"
 #include "esp_log.h"
 
@@ -32,6 +33,30 @@ static esp_err_t write_reg(uint8_t reg, uint8_t value)
 static esp_err_t read_regs(uint8_t reg, uint8_t *data, size_t len)
 {
     return i2c_master_transmit_receive(dev_handle, &reg, 1, data, len, 100);
+}
+
+
+/* Wiring diagnostics: which addresses answer, and are the lines stuck? */
+static void scan_bus(int sda, int scl)
+{
+    int found = 0;
+
+    for (int addr = 0x08; addr < 0x78; addr++)
+    {
+        if (i2c_master_probe(bus_handle, addr, 20) == ESP_OK)
+        {
+            ESP_LOGW(TAG, "I2C device at 0x%02X%s", addr,
+                     addr == 0x1D ? " <- ADXL345 with SDO high/floating: tie SDO to GND" : "");
+            found++;
+        }
+    }
+
+    if (found == 0)
+    {
+        ESP_LOGW(TAG, "I2C scan: no device. SDA(GPIO%d)=%d SCL(GPIO%d)=%d "
+                 "(both should read 1; 0 = shorted/stuck low)",
+                 sda, gpio_get_level(sda), scl, gpio_get_level(scl));
+    }
 }
 
 
@@ -77,6 +102,7 @@ esp_err_t adxl345_init(int i2c_port, int sda, int scl)
     {
         ESP_LOGE(TAG, "No answer on I2C (SDA=%d SCL=%d): %s. Check wiring, "
                  "CS->3V3, SDO->GND.", sda, scl, esp_err_to_name(ret));
+        scan_bus(sda, scl);
         return ret;
     }
 
