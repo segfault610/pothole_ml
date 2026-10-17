@@ -103,7 +103,7 @@ it at the same angle throughout.
 | speed hump (≈2 min, 20×) | `python ml/collect.py --label speed_hump --out data/bench --minutes 2` | every ~5 s: smooth **lift** 5–8 cm over ~0.4 s, come back down over ~0.4 s, small settle bounce. Press **BOOT** right after. |
 | pothole (≈2 min, 20×) | `python ml/collect.py --label pothole --out data/bench --minutes 2` | every ~5 s: quick small **drop** (2–3 cm, ~0.1 s), then a sharp **jolt up** (tap the board's edge on the table), settle. Press **BOOT** right after. |
 
-Then `python ml/train.py --data data/bench --header /tmp/bench_model.h`
+Then `python ml/train.py --data data/bench --header data/bench/model.h --report data/bench/report.md`
 to see how separable your motions are, without overwriting the firmware's model.
 
 ## Simulator
