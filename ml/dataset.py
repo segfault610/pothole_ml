@@ -58,7 +58,7 @@ def load_samples(path):
 def load_marks(path):
     marks_path = path[:-4] + ".marks"
 
-    if not os.path.exists(marks_path):
+    if not os.path.exists(marks_path) or os.path.getsize(marks_path) == 0:
         return None
 
     return np.loadtxt(marks_path, dtype=np.int64, ndmin=1)
@@ -81,13 +81,23 @@ def session_events(label, path):
     overrides = load_overrides(path)
 
     out = []
+    events = re.detect_events(samples)
 
-    for ev in re.detect_events(samples):
+    # guided sessions (collect.py --guided) put marks exactly on the accepted
+    # trigger; then only those events count, not their neighbours
+    exact = marks is not None and len(marks) > 0 and \
+        all(np.abs(np.array([e["trigger"] for e in events]) - m).min() <= 2 for m in marks) \
+        if events else False
+
+    for ev in events:
         trig = ev["trigger"]
         ev_label = label
 
         if label != "normal" and marks is not None and len(marks) > 0:
-            near = (marks >= trig - MARK_BEFORE_S * re.FS_HZ) & (marks <= trig + MARK_AFTER_S * re.FS_HZ)
+            if exact:
+                near = np.abs(marks - trig) <= 2
+            else:
+                near = (marks >= trig - MARK_BEFORE_S * re.FS_HZ) & (marks <= trig + MARK_AFTER_S * re.FS_HZ)
             if not near.any():
                 ev_label = None
 
