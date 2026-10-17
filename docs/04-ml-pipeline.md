@@ -111,14 +111,21 @@ python ml/train.py --data data/synthetic data/bench_aug data/bench
 
 Real events are re-used with random rotation, amplitude scaling (0.7–1.35×),
 time stretch (0.85–1.2×) and fresh noise, embedded in real background
-signal; classes without enough real examples are filled with parametric
-events (pothole: drop → sharp jolt → ringing; hump: smooth lift → down;
-normal: knocks, double knocks, shaking bursts) sized to the recorded
-motions. The current firmware model was trained this way (car simulator +
-augmented bench + 144 real bench events): session-grouped CV macro-F1 0.90;
-trained without the real recordings it classifies them with 95 % accuracy
-(the augmented data derives from those events, so this is not a fully
-independent test, and potholes have no clean real recordings yet).
+signal. Before augmenting, real events are filtered by their defining
+shape — humps must lift first, potholes drop first — because unmarked
+sessions contain failed attempts (35 % of the recorded "humps" dropped
+first, which taught the model that drop-first can be a hump). Classes
+without clean real examples are filled from the closest real motion and
+parametric events: with no real potholes, the real humps are **mirrored
+vertically** (drop → lift) and mixed with parametric drop → jolt → ringing
+events; normal gets knocks, double knocks and shaking bursts.
+
+The current firmware model (`forest_n10_d8`) was trained this way on car
+simulator + augmented bench + real bench data: session-grouped CV
+macro-F1 0.88. A leak-free check (augmenting from half of the real humps,
+testing on the other half) gives 80 % of unseen humps → speed hump and 91 %
+of the same motions mirrored → pothole. Desk motion is not a car; see
+[07-status.md](07-status.md).
 
 ### Tuning
 

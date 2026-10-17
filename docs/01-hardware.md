@@ -28,6 +28,9 @@ All pin numbers are defined once in [`components/board/include/board_pins.h`](..
 
 ### …or MPU-6050 (GY-521) — I2C, same pins
 
+> **Currently used.** The GY-291 used during development never answered on
+> I2C (CS→3V3, pull-ups and power cycling checked) and is presumed dead.
+
 Use this **instead of** the ADXL345 (not both). The firmware detects it at
 boot, uses only its accelerometer (100 Hz, ±8 g, 44 Hz low-pass, FIFO) and
 gives the detector the same g values, so nothing else changes.

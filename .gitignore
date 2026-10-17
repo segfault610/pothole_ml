@@ -23,6 +23,11 @@ ml/_native/
 # Local data that should stay local
 data/raw/*.local.csv
 data/synthetic/
-# bench (hand-motion) recordings are kept local; see docs/03-data-collection.md
-data/bench/
+# bench (hand-motion) recordings: accelerometer data is committed so the
+# deployed model can be rebuilt; GPS logs stay local (they reveal where you
+# recorded), as do corrupt sessions and regenerable outputs
+data/**/*.gps.csv
+data/bench/excluded/
+data/bench/model.h
+data/bench/report.md
 data/bench_aug/

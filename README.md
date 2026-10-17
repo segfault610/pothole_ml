@@ -22,9 +22,11 @@ NEO-7M ─UART─┘   (position at the moment of impact)
 | Deploy | `cp esp32_iot/main/secrets.example.h esp32_iot/main/secrets.h`, add certs, flash `esp32_iot` | [firmware](docs/02-firmware.md) |
 | Map | `cd cloud && sam build && sam deploy --guided` | [cloud & GIS](docs/05-cloud-gis.md) |
 
-> The model currently in the repo is trained on **simulated** data
-> (`ml/simulate.py`) as a placeholder. Record real drives and retrain before
-> trusting it on the road.
+> **Status (2026-10-17):** hardware + firmware + MQTT publishing with real GPS
+> work end-to-end on an MPU-6050 (GY-521). The model (`forest_n10_d8`) is
+> trained on simulated + augmented desk recordings and recognises pothole /
+> speed hump / normal desk motions; it is not yet validated on a road. The
+> map backend is written but not deployed. Details: [docs/07-status.md](docs/07-status.md).
 
 > **Security:** the Wi-Fi password from the first commit is public in the
 > history — change it. See [docs/06-security.md](docs/06-security.md).
@@ -41,10 +43,11 @@ components/          shared ESP-IDF components (C)
 esp32_collector/     firmware: stream raw data for training
 esp32_inference/     firmware: offline bench test
 esp32_iot/           firmware: detection + GPS + AWS IoT MQTT
-ml/                  collect.py, review.py, dataset.py, train.py, simulate.py, tests/
+ml/                  collect.py (guided), review.py, dataset.py, augment.py, train.py, simulate.py, tests/
 cloud/               AWS SAM backend (Lambda, DynamoDB, IoT rule, HTTP API, map)
 model/report.md      latest training report
-data/raw/            your recordings (data/legacy/ = old, unusable v1/v2 data)
+data/raw/            road recordings · data/bench/ desk recordings (GPS logs not committed)
+                     data/legacy/ = old, unusable v1/v2 data
 docs/                documentation
 ```
 

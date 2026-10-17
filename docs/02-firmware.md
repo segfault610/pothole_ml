@@ -10,7 +10,7 @@ Three ESP-IDF projects share the drivers in [`components/`](../components):
 
 | Component | What it does |
 |---|---|
-| `accel` | I2C bus + auto-detected ADXL345 or MPU-6050; 100 Hz, ±8 g, **hardware FIFO** (timing comes from the sensor clock); bus scan on failure |
+| `accel` | I2C bus + auto-detected ADXL345 or MPU-6050; 100 Hz, ±8 g from the sensor's own clock (ADXL345: hardware FIFO; MPU-6050: 1 ms DATA_RDY polling, because its byte FIFO can desynchronise); bus scan on failure |
 | `neo7m_gps` | UART2 reader task, NMEA RMC/GGA parser with checksum, UBX commands for 5 Hz |
 | `road_event` | gravity tracking, event trigger, 1.5 s window, 20 features (also used by the Python trainer) |
 | `pothole_model` | `pothole_model.h`, **generated** by `ml/train.py` |
@@ -116,6 +116,8 @@ I (41260) POTHOLE_IOT: Published (msg_id=4): {"device_id":...}
 | `#error "Copy esp32_iot/main/secrets.example.h..."` | create `secrets.h` (above) |
 | build error about `../certs/...pem` | put the three certificate files in `esp32_iot/certs/` |
 | `MQTT disconnected` loop | wrong endpoint, inactive certificate, or the certificate has no policy attached (06-security.md) |
+| `Could not open /dev/ttyUSB0, the port is busy` | close `idf.py monitor` (Ctrl+]) / `collect.py` / any serial program |
+| events every ~1 s with the board still | old firmware with an MPU-6050 — rebuild (fixed in `road_event.c` warm-up) |
 | `FIFO overflow` warnings | something blocks the sensor task > 300 ms; don't add slow code to it |
 | `static assertion failed: features changed since training` | you edited `road_event` — run `python ml/train.py` |
 | no events at all while driving | check that the mount is rigid; lower `RE_TRIGGER_G` (0.25 g) and retrain |
