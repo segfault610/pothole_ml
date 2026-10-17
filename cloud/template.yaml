@@ -1,0 +1,82 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Pothole GIS backend - IoT Core rule -> Lambda -> DynamoDB, and an HTTP API
+  serving GeoJSON plus a Leaflet/OpenStreetMap web map.
+  Deploy: see docs/05-cloud-gis.md
+
+Parameters:
+  AlertTopic:
+    Type: String
+    Default: pothole/alerts
+    Description: MQTT topic the ESP32 publishes to (AWS_IOT_TOPIC in esp32_iot/main/main.c)
+  MaxHdop:
+    Type: String
+    Default: "5"
+    Description: Reports with a worse GPS HDOP are stored but not put on the map
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Architectures: [arm64]
+    MemorySize: 256
+    Timeout: 10
+    CodeUri: src/
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref PotholeTable
+        MAX_HDOP: !Ref MaxHdop
+
+Resources:
+  PotholeTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: PK, AttributeType: S }
+        - { AttributeName: SK, AttributeType: S }
+      KeySchema:
+        - { AttributeName: PK, KeyType: HASH }
+        - { AttributeName: SK, KeyType: RANGE }
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  IngestFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: potholes.ingest_handler
+      Description: Stores pothole/hump reports and aggregates them per map cell
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref PotholeTable }
+      Events:
+        AlertRule:
+          Type: IoTRule
+          Properties:
+            AwsIotSqlVersion: "2016-03-23"
+            Sql: !Sub "SELECT *, timestamp() AS received_ms, clientid() AS clientid FROM '${AlertTopic}'"
+
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: potholes.api_handler
+      Description: GET / (map) and GET /potholes (GeoJSON)
+      Policies:
+        - DynamoDBReadPolicy: { TableName: !Ref PotholeTable }
+      Events:
+        Map:
+          Type: HttpApi
+          Properties: { Path: /, Method: GET }
+        GeoJson:
+          Type: HttpApi
+          Properties: { Path: /potholes, Method: GET }
+
+Outputs:
+  MapUrl:
+    Description: Open this in a browser
+    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/"
+  GeoJsonUrl:
+    Description: GeoJSON feed (QGIS, Google My Maps import, kepler.gl, ...)
+    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/potholes"
+  TableName:
+    Value: !Ref PotholeTable

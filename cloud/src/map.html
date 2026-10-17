@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pothole Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  html, body { height: 100%; margin: 0; font: 14px system-ui, sans-serif; }
+  #map { position: absolute; inset: 0; }
+  .panel {
+    position: absolute; z-index: 1000; top: 12px; right: 12px;
+    background: #fff; padding: 10px 14px; border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.25); max-width: 240px;
+  }
+  .panel h1 { font-size: 15px; margin: 0 0 6px; }
+  .panel label { display: block; margin: 4px 0; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+  #status { color: #666; font-size: 12px; margin-top: 6px; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div class="panel">
+  <h1>Road events</h1>
+  <label><input type="checkbox" id="showPothole" checked> <span class="dot" style="background:#d7301f"></span>Potholes</label>
+  <label><input type="checkbox" id="showHump" checked> <span class="dot" style="background:#2b8cbe"></span>Speed humps</label>
+  <label>Min. reports <input type="number" id="minReports" value="1" min="1" style="width:4em"></label>
+  <div id="status">loading…</div>
+</div>
+<script>
+  const API = (window.POTHOLE_API || "") + "/potholes";
+  const map = L.map("map").setView([12.9716, 79.1588], 14);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19, attribution: "&copy; OpenStreetMap contributors"
+  }).addTo(map);
+
+  const layer = L.layerGroup().addTo(map);
+  let fitted = false;
+
+  function style(p) {
+    const pothole = p.event === "POTHOLE";
+    return {
+      radius: 6 + Math.min(p.reports, 10) * 1.5,
+      color: pothole ? "#d7301f" : "#2b8cbe",
+      fillColor: pothole ? "#fc8d59" : "#a6bddb",
+      fillOpacity: 0.85, weight: 2
+    };
+  }
+
+  function popup(p, latlng) {
+    const t = ms => new Date(ms).toLocaleString();
+    return `<b>${p.event === "POTHOLE" ? "Pothole" : "Speed hump"}</b><br>
+      Reports: ${p.reports} from ${p.devices} device(s)<br>
+      Confidence: ${(p.confidence * 100).toFixed(0)}%<br>
+      Max severity: ${p.max_severity_g} g<br>
+      First seen: ${t(p.first_seen)}<br>Last seen: ${t(p.last_seen)}<br>
+      <a target="_blank" href="https://www.google.com/maps?q=${latlng.lat},${latlng.lng}">Open in Google Maps</a>`;
+  }
+
+  async function refresh() {
+    const min = document.getElementById("minReports").value || 1;
+    try {
+      const res = await fetch(`${API}?min_reports=${min}`);
+      const data = await res.json();
+      const show = {
+        POTHOLE: document.getElementById("showPothole").checked,
+        SPEED_HUMP: document.getElementById("showHump").checked
+      };
+      layer.clearLayers();
+      const pts = [];
+      for (const f of data.features) {
+        if (!show[f.properties.event]) continue;
+        const [lon, lat] = f.geometry.coordinates;
+        const m = L.circleMarker([lat, lon], style(f.properties));
+        m.bindPopup(popup(f.properties, { lat, lng: lon }));
+        m.addTo(layer);
+        pts.push([lat, lon]);
+      }
+      if (!fitted && pts.length) { map.fitBounds(pts, { maxZoom: 16, padding: [40, 40] }); fitted = true; }
+      document.getElementById("status").textContent =
+        `${pts.length} marker(s) · updated ${new Date().toLocaleTimeString()}`;
+    } catch (e) {
+      document.getElementById("status").textContent = "could not load data: " + e;
+    }
+  }
+
+  for (const id of ["showPothole", "showHump", "minReports"]) {
+    document.getElementById(id).addEventListener("change", refresh);
+  }
+  refresh();
+  setInterval(refresh, 30000);
+</script>
+</body>
+</html>
