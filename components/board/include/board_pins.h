@@ -13,6 +13,13 @@
  *   CS                        3V3   (I2C mode)
  *   SDO                       GND   (address 0x53)
  *
+ *   ...or MPU-6050 (GY-521)   ESP32  (auto-detected, use one sensor)
+ *   VCC                       3V3 (or VIN/5V)
+ *   GND                       GND
+ *   SCL                       GPIO22
+ *   SDA                       GPIO21
+ *   AD0                       GND   (address 0x68)
+ *
  *   NEO-7M (GY-NEO7M)         ESP32
  *   -----------------         -----------
  *   VCC                       3V3 (or VIN/5V if the module has a regulator)

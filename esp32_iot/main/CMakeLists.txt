@@ -3,7 +3,7 @@ idf_component_register(
     INCLUDE_DIRS "."
     REQUIRES
         board
-        adxl345
+        accel
         neo7m_gps
         road_event
         pothole_model

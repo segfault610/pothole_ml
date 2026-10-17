@@ -1,7 +1,7 @@
 /*
  * ESP32 POTHOLE DATA COLLECTOR
  *
- * Streams every accelerometer sample (100 Hz, from the ADXL345 FIFO) and
+ * Streams every accelerometer sample (100 Hz, from the ADXL345 or MPU-6050 FIFO) and
  * the GPS state over USB serial. ml/collect.py records the stream into
  * a session file; labelling and event extraction happen on the laptop.
  *
@@ -27,7 +27,7 @@
 #include "driver/gpio.h"
 #include "esp_timer.h"
 
-#include "adxl345.h"
+#include "accel.h"
 #include "board_pins.h"
 #include "gps_neo7m.h"
 #include "pothole_model.h"
@@ -59,7 +59,7 @@ void app_main(void)
     printf("\n# ========================================\n");
     printf("#   ESP32 POTHOLE ML DATA COLLECTOR\n");
     printf("# ========================================\n");
-    printf("# ADXL345 SDA=GPIO%d SCL=GPIO%d | GPS RX=GPIO%d TX=GPIO%d\n",
+    printf("# accel I2C SDA=GPIO%d SCL=GPIO%d | GPS RX=GPIO%d TX=GPIO%d\n",
            BOARD_I2C_SDA, BOARD_I2C_SCL, BOARD_GPS_RX, BOARD_GPS_TX);
     printf("# model: %s%s\n", MODEL_NAME, MODEL_IS_SYNTHETIC ? " (SYNTHETIC placeholder)" : "");
 
@@ -69,9 +69,9 @@ void app_main(void)
     }
 
     /* keep retrying so the stream starts as soon as the wiring is fixed */
-    while (adxl345_init(BOARD_I2C_PORT, BOARD_I2C_SDA, BOARD_I2C_SCL) != ESP_OK)
+    while (accel_init(BOARD_I2C_PORT, BOARD_I2C_SDA, BOARD_I2C_SCL) != ESP_OK)
     {
-        printf("W,ADXL345 not found - check wiring (docs/01-hardware.md), retrying\n");
+        printf("W,Accelerometer not found - check wiring (docs/01-hardware.md), retrying\n");
         print_gps();
         vTaskDelay(pdMS_TO_TICKS(2000));
     }
@@ -85,20 +85,21 @@ void app_main(void)
     gpio_config(&btn);
     int last_button = 1;
 
+    printf("# accelerometer: %s\n", accel_name());
     printf("DATA_BEGIN\n");
 
     static re_detector_t det;
     static re_window_t win;
     road_event_init(&det);
 
-    adxl345_raw_t buf[ADXL345_FIFO_DEPTH];
+    accel_sample_t buf[ACCEL_MAX_BATCH];
     uint32_t seq = 0;
     int64_t next_gps = 0;
 
     while (1)
     {
         int overflow = 0;
-        int n = adxl345_read_fifo(buf, ADXL345_FIFO_DEPTH, &overflow);
+        int n = accel_read(buf, ACCEL_MAX_BATCH, &overflow);
 
         if (n < 0)
         {
@@ -112,9 +113,9 @@ void app_main(void)
 
         for (int i = 0; i < n; i++)
         {
-            float x = buf[i].x * ADXL345_LSB_G;
-            float y = buf[i].y * ADXL345_LSB_G;
-            float z = buf[i].z * ADXL345_LSB_G;
+            float x = buf[i].x;
+            float y = buf[i].y;
+            float z = buf[i].z;
 
             printf("D,%lu,%.4f,%.4f,%.4f\n", (unsigned long)seq, x, y, z);
             seq++;

@@ -10,7 +10,7 @@ Three ESP-IDF projects share the drivers in [`components/`](../components):
 
 | Component | What it does |
 |---|---|
-| `adxl345` | I2C driver, 100 Hz, ±8 g full-res, **FIFO stream mode** (timing comes from the sensor clock) |
+| `accel` | I2C bus + auto-detected ADXL345 or MPU-6050; 100 Hz, ±8 g, **hardware FIFO** (timing comes from the sensor clock); bus scan on failure |
 | `neo7m_gps` | UART2 reader task, NMEA RMC/GGA parser with checksum, UBX commands for 5 Hz |
 | `road_event` | gravity tracking, event trigger, 1.5 s window, 20 features (also used by the Python trainer) |
 | `pothole_model` | `pothole_model.h`, **generated** by `ml/train.py` |

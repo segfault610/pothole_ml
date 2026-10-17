@@ -1,6 +1,6 @@
 # Low-power pothole detection
 
-ESP32 + ADXL345 + NEO-7M GPS that detects **potholes** and **speed humps**
+ESP32 + ADXL345 (or MPU-6050) + NEO-7M GPS that detects **potholes** and **speed humps**
 while driving, classifies them on the device with a small tree-ensemble
 model, and publishes them with their GPS position to **AWS IoT Core**, where
 they are aggregated onto a live **map**.
@@ -33,7 +33,7 @@ NEO-7M ─UART─┘   (position at the moment of impact)
 
 ```
 components/          shared ESP-IDF components (C)
-  adxl345/           accelerometer driver (FIFO, 100 Hz)
+  accel/             accelerometer drivers: ADXL345 or MPU-6050, auto-detected
   neo7m_gps/         GPS UART task + NMEA parser
   road_event/        event detector + 20 features (also used by Python)
   pothole_model/     generated model header

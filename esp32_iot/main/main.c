@@ -1,7 +1,7 @@
 /*
  * ESP32 POTHOLE IOT SYSTEM
  *
- *   ADXL345 (I2C, 100 Hz FIFO) --> road_event detector --> tree model
+ *   ADXL345 or MPU-6050 (I2C, 100 Hz) --> road_event detector --> tree model
  *                                                            |
  *   NEO-7M (UART2, 5 Hz NMEA) --> position at the trigger ---+
  *                                                            v
@@ -36,7 +36,7 @@
 #include "driver/gpio.h"
 #include "mqtt_client.h"
 
-#include "adxl345.h"
+#include "accel.h"
 #include "board_pins.h"
 #include "gps_neo7m.h"
 #include "pothole_model.h"
@@ -288,7 +288,7 @@ static void sensor_task(void *arg)
 {
     static re_detector_t det;
     static re_window_t win;
-    static adxl345_raw_t buf[ADXL345_FIFO_DEPTH];
+    static accel_sample_t buf[ACCEL_MAX_BATCH];
 
     gps_state_t gps_at_trigger;
     memset(&gps_at_trigger, 0, sizeof(gps_at_trigger));
@@ -298,24 +298,24 @@ static void sensor_task(void *arg)
     while (1)
     {
         int overflow = 0;
-        int n = adxl345_read_fifo(buf, ADXL345_FIFO_DEPTH, &overflow);
+        int n = accel_read(buf, ACCEL_MAX_BATCH, &overflow);
 
         if (n < 0)
         {
-            ESP_LOGW(TAG, "ADXL345 read failed");
+            ESP_LOGW(TAG, "Accelerometer read failed");
         }
 
         if (overflow)
         {
-            ESP_LOGW(TAG, "ADXL345 FIFO overflow (samples lost)");
+            ESP_LOGW(TAG, "Accelerometer FIFO overflow (samples lost)");
         }
 
         for (int i = 0; i < n; i++)
         {
             int r = road_event_push(&det,
-                                    buf[i].x * ADXL345_LSB_G,
-                                    buf[i].y * ADXL345_LSB_G,
-                                    buf[i].z * ADXL345_LSB_G);
+                                    buf[i].x,
+                                    buf[i].y,
+                                    buf[i].z);
 
             if (r == RE_TRIGGERED)
             {
@@ -467,9 +467,9 @@ void app_main(void)
     /* sensors first: detection must not wait for the network */
     gps_init(BOARD_GPS_UART, BOARD_GPS_RX, BOARD_GPS_TX, BOARD_GPS_BAUD, true);
 
-    if (adxl345_init(BOARD_I2C_PORT, BOARD_I2C_SDA, BOARD_I2C_SCL) != ESP_OK)
+    if (accel_init(BOARD_I2C_PORT, BOARD_I2C_SDA, BOARD_I2C_SCL) != ESP_OK)
     {
-        ESP_LOGE(TAG, "ADXL345 initialization failed - check wiring (docs/01-hardware.md)");
+        ESP_LOGE(TAG, "Accelerometer initialization failed - check wiring (docs/01-hardware.md)");
         return;
     }
 

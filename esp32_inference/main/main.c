@@ -19,7 +19,7 @@
 
 #include "esp_timer.h"
 
-#include "adxl345.h"
+#include "accel.h"
 #include "board_pins.h"
 #include "gps_neo7m.h"
 #include "pothole_model.h"
@@ -91,9 +91,9 @@ void app_main(void)
 
     gps_init(BOARD_GPS_UART, BOARD_GPS_RX, BOARD_GPS_TX, BOARD_GPS_BAUD, true);
 
-    if (adxl345_init(BOARD_I2C_PORT, BOARD_I2C_SDA, BOARD_I2C_SCL) != ESP_OK)
+    if (accel_init(BOARD_I2C_PORT, BOARD_I2C_SDA, BOARD_I2C_SCL) != ESP_OK)
     {
-        printf("ADXL345 initialization failed - check wiring (docs/01-hardware.md)\n");
+        printf("Accelerometer initialization failed - check wiring (docs/01-hardware.md)\n");
         return;
     }
 
@@ -101,7 +101,7 @@ void app_main(void)
     static re_window_t win;
     road_event_init(&det);
 
-    adxl345_raw_t buf[ADXL345_FIFO_DEPTH];
+    accel_sample_t buf[ACCEL_MAX_BATCH];
     int64_t next_status = 0;
 
     printf("calibrating gravity, keep still for 2 s...\n");
@@ -109,7 +109,7 @@ void app_main(void)
     while (1)
     {
         int overflow = 0;
-        int n = adxl345_read_fifo(buf, ADXL345_FIFO_DEPTH, &overflow);
+        int n = accel_read(buf, ACCEL_MAX_BATCH, &overflow);
 
         if (overflow)
         {
@@ -119,9 +119,9 @@ void app_main(void)
         for (int i = 0; i < n; i++)
         {
             int r = road_event_push(&det,
-                                    buf[i].x * ADXL345_LSB_G,
-                                    buf[i].y * ADXL345_LSB_G,
-                                    buf[i].z * ADXL345_LSB_G);
+                                    buf[i].x,
+                                    buf[i].y,
+                                    buf[i].z);
 
             if (det.seq == RE_WARMUP)
             {

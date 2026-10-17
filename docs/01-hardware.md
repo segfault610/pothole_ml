@@ -5,7 +5,7 @@
 | Part | Notes |
 |---|---|
 | ESP32 NodeMCU / DevKit V1 (ESP32-WROOM-32) | the "classic" 30/38-pin board |
-| ADXL345 breakout (GY-291) | 3-axis accelerometer, I2C |
+| ADXL345 breakout (GY-291) **or** MPU-6050 breakout (GY-521) | accelerometer, I2C — the firmware auto-detects either |
 | u-blox NEO-7M breakout (GY-NEO7M) + active/patch antenna | GPS, UART, 9600 baud default |
 | Jumper wires, small perfboard / enclosure | something rigid |
 | USB cable + 5 V source in the car (USB car charger / power bank) | the ESP32 is powered over USB |
@@ -25,6 +25,24 @@ All pin numbers are defined once in [`components/board/include/board_pins.h`](..
 | CS | **3V3** | high = I2C mode (most GY-291 boards already pull it up) |
 | SDO / ALT ADDR | **GND** | selects I2C address **0x53** (the firmware expects it) |
 | INT1, INT2 | not connected | the firmware polls the FIFO instead |
+
+### …or MPU-6050 (GY-521) — I2C, same pins
+
+Use this **instead of** the ADXL345 (not both). The firmware detects it at
+boot, uses only its accelerometer (100 Hz, ±8 g, 44 Hz low-pass, FIFO) and
+gives the detector the same g values, so nothing else changes.
+
+| GY-521 pin | ESP32 pin | Why |
+|---|---|---|
+| VCC | **3V3** (or **VIN/5V**; the module has its own 3.3 V regulator and pull-ups to 3.3 V) | |
+| GND | **GND** | |
+| SCL | **GPIO22** | I2C clock |
+| SDA | **GPIO21** | I2C data |
+| AD0 | **GND** | address **0x68** (0x69 if high — also detected) |
+| XDA, XCL, INT | not connected | auxiliary I2C / interrupt, unused |
+
+Train and deploy with the **same** sensor: an MPU-6050 has different noise
+and filtering than an ADXL345, so retrain after switching.
 
 ### NEO-7M (GY-NEO7M) — UART2
 
@@ -109,9 +127,12 @@ vibrations and makes potholes and humps look alike.
 ## Bring-up checklist
 
 1. Flash `esp32_inference` (see [02-firmware.md](02-firmware.md)) and open the monitor.
-2. You should see `ADXL345 ... ready: 100 Hz, +/-8 g, FIFO stream`.
-   - `No answer on I2C` → check SDA/SCL, CS→3V3, SDO→GND, power.
-   - `DEVID 0x.., expected 0xE5` → not an ADXL345 or wrong address.
+2. You should see `ACCEL: using ADXL345: 100 Hz, +/-8 g, FIFO` (or `MPU-6050`).
+   - `I2C scan: no device ... SDA=1 SCL=1` → the sensor is not powered or its
+     SDA/SCL do not reach GPIO21/22 (wrong pin row, loose/unsoldered header,
+     SDA/SCL swapped, ADXL345 CS not tied to 3V3).
+   - `SDA=0` or `SCL=0` → a line is shorted to GND.
+   - `I2C device at 0x..` → something answers, but not at a supported address.
 3. After 2 s: `ready - waiting for road events`. Tap the sensor sharply —
    an `EVENT ...` block must appear.
 4. Every 10 s a `[gps]` line appears:
