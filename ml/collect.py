@@ -90,8 +90,9 @@ class Recorder(threading.Thread):
         self.det = re.Detector()
         self.events = queue.Queue()
         self.button = queue.Queue()
-        self.seq = 0
-        self.samples = 0
+        self.seq = 0                # ESP32 sample counter (keeps counting since boot)
+        self.samples = 0            # rows written = index used by the detector/.marks
+        self.first_seq = None
         self.lost = 0
         self.vertical = 0.0         # latest vertical dyn. accel (for the meter)
         self.peak = 0.0             # largest |vertical| since reset_peak()
@@ -100,6 +101,12 @@ class Recorder(threading.Thread):
         self.stop = threading.Event()
         self._expected = None
         self._g = None
+
+    def row_of(self, device_seq):
+        """File row (= detector index) of an ESP32 sample counter value."""
+        if self.first_seq is None:
+            return 0
+        return max(device_seq - self.first_seq - self.lost, 0)
 
     def reset_peak(self):
         self.peak = 0.0
@@ -122,7 +129,7 @@ class Recorder(threading.Thread):
                     self._gps(line, fg)
                 elif line.startswith("M,"):
                     try:
-                        self.button.put(int(line.split(",")[1]))
+                        self.button.put(self.row_of(int(line.split(",")[1])))
                     except (IndexError, ValueError):
                         pass
                 elif line.startswith("W,"):
@@ -141,6 +148,8 @@ class Recorder(threading.Thread):
         if self._expected is not None and seq != self._expected:
             self.lost += max(seq - self._expected, 0)
         self._expected = seq + 1
+        if self.first_seq is None:
+            self.first_seq = seq
         self.seq = seq
         self.samples += 1
         fd.write(f"{seq},{p[2]},{p[3]},{p[4]}\n")
@@ -263,7 +272,7 @@ def guided(rec, label, reps, marks):
 
         drain(rec.events)
         countdown(rec, what if not move else move["title"])
-        start = rec.seq
+        start = rec.samples          # same units as the detector's trigger index
         ev = wait_for_event(rec, start, ACTION_WINDOW_S)
 
         if ev is None:
@@ -306,8 +315,8 @@ def free(rec, label, minutes, marks):
                 return
             if rec.stop.is_set() or line == "":
                 return
-            marks.append(rec.seq)
-            print(f"  >>> MARK #{len(marks)} (ENTER) at sample {rec.seq}", flush=True)
+            marks.append(rec.samples)
+            print(f"  >>> MARK #{len(marks)} (ENTER) at sample {rec.samples}", flush=True)
 
     threading.Thread(target=keyboard, daemon=True).start()
 
