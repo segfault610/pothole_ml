@@ -85,6 +85,7 @@ PRE = _lib.re_const(1)
 POST = _lib.re_const(2)
 WIN = PRE + POST
 NUM_FEATURES = _lib.re_const(3)
+TRIGGER_G = _lib.re_const(4) / 1000.0
 FEATURE_NAMES = [_lib.re_feature_name(i).decode() for i in range(NUM_FEATURES)]
 
 IDLE, TRIGGERED, WINDOW_READY = 0, 1, 2

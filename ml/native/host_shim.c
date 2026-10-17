@@ -18,6 +18,7 @@ int re_const(int which)
         case 1: return RE_PRE;
         case 2: return RE_POST;
         case 3: return RE_NUM_FEATURES;
+        case 4: return (int)(RE_TRIGGER_G * 1000.0f + 0.5f);   /* milli-g */
         default: return -1;
     }
 }

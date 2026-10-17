@@ -20,7 +20,7 @@ You need a driver **and a passenger** — the passenger handles the laptop.
 ## Recording a session
 
 ```bash
-python ml/collect.py --label pothole        # Ctrl+C when done
+python ml/collect.py --label pothole        # free mode for driving; Ctrl+C when done
 python ml/collect.py --label speed_hump
 python ml/collect.py --label normal --minutes 10
 ```
@@ -97,11 +97,32 @@ checking the wiring, the detector, marks and training end-to-end, and for a
 desk demo. Hold the breadboard flat, sensor mounted firmly on it, and keep
 it at the same angle throughout.
 
-| Session | Command | What to do |
-|---|---|---|
-| normal (2 min) | `python ml/collect.py --label normal --out data/bench --minutes 2` | "cruising": slow, gentle up-down sway (1–2 Hz, 1–2 cm) like a car body; every ~10 s a light knock on the table (road joint) or 2 s of fine jitter (rough patch). No button presses. |
-| speed hump (≈2 min, 20×) | `python ml/collect.py --label speed_hump --out data/bench --minutes 2` | every ~5 s: smooth **lift** 5–8 cm over ~0.4 s, come back down over ~0.4 s, small settle bounce. Press **BOOT** right after. |
-| pothole (≈2 min, 20×) | `python ml/collect.py --label pothole --out data/bench --minutes 2` | every ~5 s: quick small **drop** (2–3 cm, ~0.1 s), then a sharp **jolt up** (tap the board's edge on the table), settle. Press **BOOT** right after. |
+Use **guided mode** — run it in your own terminal so you see the prompts:
+
+```bash
+python ml/collect.py --label normal     --guided --out data/bench
+python ml/collect.py --label speed_hump --guided --out data/bench
+python ml/collect.py --label pothole    --guided --out data/bench
+```
+
+For every repetition it shows what to do, counts down `3… 2… 1… GO!`
+(with a beep), shows a live up/down g-meter, and then judges the rep:
+
+| Result | Meaning |
+|---|---|
+| `GOOD` | detected, right shape → labelled and counted |
+| `MISSED` | stayed below the 0.25 g trigger → do it harder/sharper; repeated |
+| `WRONG SHAPE` | pothole that lifted first / hump that dropped first; repeated |
+
+It stops after `--reps` good repetitions (default 20). Ctrl+C keeps
+everything recorded so far. Motions:
+
+- **normal** — keep a gentle sway (1–2 cm, 1–2×/s) the whole time; at GO do
+  the disturbance it names (firm knock, 1 s strong shaking, sharp wiggle,
+  double knock).
+- **speed hump** — at GO: smooth lift 5–8 cm over ~0.4 s, back down, settle.
+- **pothole** — at GO: quick 2–3 cm drop, then a sharp jolt up (tap the
+  board's edge on the table), settle.
 
 Then `python ml/train.py --data data/bench --header data/bench/model.h --report data/bench/report.md`
 to see how separable your motions are, without overwriting the firmware's model.
