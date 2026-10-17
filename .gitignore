@@ -1,0 +1,26 @@
+# ESP-IDF build output / generated config
+build/
+**/build/
+managed_components/
+sdkconfig
+sdkconfig.old
+
+# Secrets — never commit these (see docs/06-security.md)
+**/certs/*.pem
+**/certs/*.crt
+**/certs/*.key
+esp32_iot/main/secrets.h
+cloud/.aws-sam/
+cloud/samconfig.toml
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+ml/_native/
+*.egg-info/
+
+# Local data that should stay local
+data/raw/*.local.csv
+data/synthetic/
+sdkconfig.pre-refactor

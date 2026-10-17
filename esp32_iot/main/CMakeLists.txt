@@ -1,12 +1,15 @@
 idf_component_register(
     SRCS "main.c"
-    INCLUDE_DIRS
-        "."
-        "../../model"
+    INCLUDE_DIRS "."
     REQUIRES
+        board
+        adxl345
+        neo7m_gps
+        road_event
+        pothole_model
         nvs_flash
         esp_wifi
-        esp_driver_i2c
+        esp_driver_gpio
         mqtt
     EMBED_TXTFILES
         "../certs/aws_root_ca.pem"
