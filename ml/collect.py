@@ -101,6 +101,8 @@ class Recorder(threading.Thread):
         self.stop = threading.Event()
         self._expected = None
         self._g = None
+        self._plausible = 1.0
+        self._last_bad = 0.0
 
     def row_of(self, device_seq):
         """File row (= detector index) of an ESP32 sample counter value."""
@@ -160,6 +162,13 @@ class Recorder(threading.Thread):
         gm = np.linalg.norm(self._g)
         self.vertical = float(a @ self._g / gm - gm) if gm > 0 else 0.0
         self.peak = max(self.peak, abs(self.vertical))
+
+        # sanity: at 100 Hz most samples should be near 1 g even while moving
+        self._plausible = 0.99 * self._plausible + 0.01 * (0.4 < np.linalg.norm(a) < 2.5)
+        if self.samples > 200 and self._plausible < 0.5 and time.time() - self._last_bad > 3:
+            self._last_bad = time.time()
+            self.warnings.append("SENSOR DATA LOOKS CORRUPT (|a| far from 1 g) - stop (Ctrl+C), "
+                                 "check the wiring, unplug/replug the ESP32")
 
         r = self.det.push(x, y, z)
         if r == re.WINDOW_READY:
@@ -292,7 +301,8 @@ def guided(rec, label, reps, marks):
                 print(f"   {green('GOOD')} ({info})   {len(marks)}/{reps} done")
 
         if rec.warnings:
-            print("   ESP32:", "; ".join(rec.warnings))
+            bell()
+            print("   " + red("WARNING: " + "; ".join(dict.fromkeys(rec.warnings))))
             rec.warnings.clear()
 
         sys.stdout.write(dim("   hold still..." if move else "   keep swaying gently..."))
@@ -340,6 +350,10 @@ def free(rec, label, minutes, marks):
         while not rec.button.empty():
             marks.append(rec.button.get())
             print(f"  >>> MARK #{len(marks)} (BOOT button) at sample {marks[-1]}", flush=True)
+
+        if rec.warnings:
+            print(red("  WARNING: " + "; ".join(dict.fromkeys(rec.warnings))), flush=True)
+            rec.warnings.clear()
 
         if time.time() - last_status > 5:
             last_status = time.time()

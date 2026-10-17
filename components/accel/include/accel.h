@@ -5,8 +5,9 @@
  *   ADXL345 (GY-291)  address 0x53 (SDO->GND) or 0x1D
  *   MPU-6050 (GY-521) address 0x68 (AD0->GND) or 0x69
  *
- * Both run at 100 Hz from their own sample clock into their hardware FIFO
- * with a ~45-50 Hz low-pass and a +/-8 g range. Samples come out in g, so
+ * Both run at 100 Hz from their own sample clock with a ~45-50 Hz low-pass
+ * and a +/-8 g range (ADXL345: hardware FIFO; MPU-6050: DATA_RDY polling,
+ * see mpu6050.c for why). Samples come out in g, so
  * the road_event detector and the model do not care which sensor is used.
  */
 

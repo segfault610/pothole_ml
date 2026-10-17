@@ -36,6 +36,9 @@ LABELS = ["normal", "speed_hump", "pothole"]
 MARK_BEFORE_S = 1.0     # mark may come this long before the trigger
 MARK_AFTER_S = 2.0      # ...or this long after (human reaction time)
 
+GRAVITY_MIN_G = 0.8     # events whose gravity estimate falls outside this
+GRAVITY_MAX_G = 1.25    # range (or that saturate the sensor) are dropped
+
 
 def list_sessions(data_dirs):
     sessions = []
@@ -104,6 +107,12 @@ def session_events(label, path):
         if trig in overrides:
             ev_label = None if overrides[trig] == "discard" else overrides[trig]
 
+        # a scrambled sensor stream gives a nonsense gravity estimate
+        g_mag = float(np.linalg.norm(ev["g"]))
+        if not (GRAVITY_MIN_G <= g_mag <= GRAVITY_MAX_G) or np.abs(ev["window"]).max() > 7.9:
+            ev_label = None
+            ev["rejected"] = f"implausible data (|g|={g_mag:.2f}, max {np.abs(ev['window']).max():.1f} g)"
+
         ev["label"] = ev_label
         ev["session"] = path
         out.append(ev)
@@ -120,7 +129,9 @@ def build(data_dirs, verbose=True):
         kept = [e for e in evs if e["label"] is not None]
 
         if verbose:
-            print(f"  {label:10s} {os.path.basename(path):40s} events={len(evs):3d} kept={len(kept):3d}")
+            bad = sum(1 for e in evs if "rejected" in e)
+            print(f"  {label:10s} {os.path.basename(path):40s} events={len(evs):3d} kept={len(kept):3d}"
+                  + (f"  !! {bad} events with implausible sensor data dropped" if bad else ""))
 
         for e in kept:
             X.append(re.features(e["window"], e["g"]))

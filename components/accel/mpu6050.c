@@ -1,35 +1,42 @@
 /*
  * MPU-6050 (GY-521) backend: accelerometer only, 100 Hz, +/-8 g
- * (4096 LSB/g), 44 Hz digital low-pass, samples buffered in the
- * 1024-byte FIFO (170 samples, 1.7 s). The gyro is not used.
+ * (4096 LSB/g), 44 Hz digital low-pass. The gyro is not used.
  *
- * Also accepts the common MPU-6500 / MPU-9250 clones that answer with a
+ * Why no hardware FIFO: the MPU-6050 FIFO is a plain byte stream. If one
+ * I2C burst is cut short (a breadboard wire flickering while the board is
+ * shaken), a partial sample is popped and every later sample is read
+ * misaligned - permanently scrambled data. Instead a small task polls the
+ * DATA_RDY flag every 1 ms and reads each sample as one 6-byte register
+ * snapshot, so a glitch can damage at most a single sample. Timing still
+ * comes from the sensor's own 100 Hz clock.
+ *
+ * Also accepts MPU-6500 / MPU-9250 style clones that answer with a
  * different WHO_AM_I but share this register map.
  */
 
 #include "accel_backend.h"
 
 #include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
 #include "freertos/task.h"
 #include "esp_log.h"
 
 #define REG_SMPLRT_DIV      0x19
 #define REG_CONFIG          0x1A
 #define REG_ACCEL_CONFIG    0x1C
-#define REG_FIFO_EN         0x23
 #define REG_INT_STATUS      0x3A
-#define REG_USER_CTRL       0x6A
+#define REG_ACCEL_XOUT_H    0x3B
 #define REG_PWR_MGMT_1      0x6B
-#define REG_FIFO_COUNT_H    0x72
-#define REG_FIFO_R_W        0x74
 #define REG_WHO_AM_I        0x75
 
 #define LSB_G               (1.0f / 4096.0f)
-#define BYTES_PER_SAMPLE    6
+#define QUEUE_LEN           64          /* 640 ms of samples */
 
 static const char *TAG = "MPU6050";
 
 static i2c_master_dev_handle_t dev;
+static QueueHandle_t samples;
+static volatile int lost;
 
 
 static esp_err_t write_reg(uint8_t reg, uint8_t value)
@@ -46,13 +53,31 @@ static esp_err_t read_regs(uint8_t reg, uint8_t *data, size_t len)
 }
 
 
-static esp_err_t fifo_reset(void)
+static void poll_task(void *arg)
 {
-    /* disable FIFO, reset it, enable it again */
-    esp_err_t ret = write_reg(REG_USER_CTRL, 0x00);
-    if (ret == ESP_OK) ret = write_reg(REG_USER_CTRL, 0x04);
-    if (ret == ESP_OK) ret = write_reg(REG_USER_CTRL, 0x40);
-    return ret;
+    while (1)
+    {
+        uint8_t status = 0;
+        uint8_t d[6];
+
+        /* reading INT_STATUS clears DATA_RDY */
+        if (read_regs(REG_INT_STATUS, &status, 1) == ESP_OK && (status & 0x01) &&
+            read_regs(REG_ACCEL_XOUT_H, d, sizeof(d)) == ESP_OK)
+        {
+            accel_sample_t s = {
+                .x = (int16_t)((d[0] << 8) | d[1]) * LSB_G,
+                .y = (int16_t)((d[2] << 8) | d[3]) * LSB_G,
+                .z = (int16_t)((d[4] << 8) | d[5]) * LSB_G,
+            };
+
+            if (xQueueSend(samples, &s, 0) != pdTRUE)
+            {
+                lost = 1;
+            }
+        }
+
+        vTaskDelay(1);      /* 1 ms at CONFIG_FREERTOS_HZ=1000 */
+    }
 }
 
 
@@ -116,9 +141,11 @@ static esp_err_t mpu6050_init(i2c_master_bus_handle_t bus)
     /* AFS_SEL=2: +/-8 g */
     if (ret == ESP_OK) ret = write_reg(REG_ACCEL_CONFIG, 0x10);
 
-    /* only the accelerometer goes into the FIFO */
-    if (ret == ESP_OK) ret = write_reg(REG_FIFO_EN, 0x08);
-    if (ret == ESP_OK) ret = fifo_reset();
+    if (ret == ESP_OK && samples == NULL)
+    {
+        samples = xQueueCreate(QUEUE_LEN, sizeof(accel_sample_t));
+        xTaskCreatePinnedToCore(poll_task, "mpu6050", 2560, NULL, 12, NULL, 1);
+    }
 
     return ret;
 }
@@ -126,59 +153,17 @@ static esp_err_t mpu6050_init(i2c_master_bus_handle_t bus)
 
 static int mpu6050_read(accel_sample_t *out, int max, int *overflow)
 {
-    uint8_t status = 0;
-    uint8_t cnt[2];
+    int n = 0;
 
-    if (read_regs(REG_INT_STATUS, &status, 1) != ESP_OK ||
-        read_regs(REG_FIFO_COUNT_H, cnt, 2) != ESP_OK)
+    while (n < max && xQueueReceive(samples, &out[n], 0) == pdTRUE)
     {
-        return -1;
+        n++;
     }
 
-    if (status & 0x10)
+    if (overflow && lost)
     {
-        /* FIFO overflowed: its contents are no longer sample-aligned */
-        if (overflow)
-        {
-            *overflow = 1;
-        }
-
-        fifo_reset();
-        return 0;
-    }
-
-    int n = ((cnt[0] << 8) | cnt[1]) / BYTES_PER_SAMPLE;
-
-    if (n > max)
-    {
-        n = max;
-    }
-
-    if (n == 0)
-    {
-        return 0;
-    }
-
-    uint8_t d[ACCEL_MAX_BATCH * BYTES_PER_SAMPLE];
-
-    if (n > ACCEL_MAX_BATCH)
-    {
-        n = ACCEL_MAX_BATCH;
-    }
-
-    if (read_regs(REG_FIFO_R_W, d, n * BYTES_PER_SAMPLE) != ESP_OK)
-    {
-        return -1;
-    }
-
-    for (int i = 0; i < n; i++)
-    {
-        const uint8_t *s = &d[i * BYTES_PER_SAMPLE];
-
-        /* big-endian, unlike the ADXL345 */
-        out[i].x = (int16_t)((s[0] << 8) | s[1]) * LSB_G;
-        out[i].y = (int16_t)((s[2] << 8) | s[3]) * LSB_G;
-        out[i].z = (int16_t)((s[4] << 8) | s[5]) * LSB_G;
+        *overflow = 1;
+        lost = 0;
     }
 
     return n;
