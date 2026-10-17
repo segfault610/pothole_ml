@@ -11,6 +11,7 @@
  *   G,<fix>,<lat>,<lon>,<kmh>,<sats>,<hdop>   once per second
  *   E,<trigger_seq>,<class>,<confidence>      live preview of the on-device
  *                                             detector + current model
+ *   M,<seq>                             BOOT button pressed (event mark)
  *   W,<text>                            warning (e.g. FIFO overflow)
  *   # ...                               human-readable info, ignored
  *
@@ -23,6 +24,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+#include "driver/gpio.h"
 #include "esp_timer.h"
 
 #include "adxl345.h"
@@ -66,15 +68,22 @@ void app_main(void)
         printf("W,gps init failed\n");
     }
 
-    if (adxl345_init(BOARD_I2C_PORT, BOARD_I2C_SDA, BOARD_I2C_SCL) != ESP_OK)
+    /* keep retrying so the stream starts as soon as the wiring is fixed */
+    while (adxl345_init(BOARD_I2C_PORT, BOARD_I2C_SDA, BOARD_I2C_SCL) != ESP_OK)
     {
-        printf("W,ADXL345 init failed - check wiring (docs/01-hardware.md)\n");
-
-        while (1)
-        {
-            vTaskDelay(pdMS_TO_TICKS(1000));
-        }
+        printf("W,ADXL345 not found - check wiring (docs/01-hardware.md), retrying\n");
+        print_gps();
+        vTaskDelay(pdMS_TO_TICKS(2000));
     }
+
+    /* BOOT button (GPIO0, active low): press it to mark an event */
+    gpio_config_t btn = {
+        .pin_bit_mask = 1ULL << BOARD_MARK_BUTTON,
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+    };
+    gpio_config(&btn);
+    int last_button = 1;
 
     printf("DATA_BEGIN\n");
 
@@ -123,6 +132,15 @@ void app_main(void)
                        CLASS_NAMES[c], (double)proba[c]);
             }
         }
+
+        int button = gpio_get_level(BOARD_MARK_BUTTON);
+
+        if (button == 0 && last_button == 1)
+        {
+            printf("M,%lu\n", (unsigned long)seq);
+        }
+
+        last_button = button;
 
         int64_t now = esp_timer_get_time();
 

@@ -8,7 +8,7 @@ Record a labelled driving session from esp32_collector over USB serial.
 Recording is continuous (no countdowns, nothing to time by hand). Every
 sample is saved, so you can re-run detection with other settings later.
 
-While recording, a passenger presses ENTER each time the car goes over
+While recording, a passenger presses ENTER (or the ESP32's BOOT button) each time the car goes over
 the thing you are collecting (pothole / speed hump). Those marks tell
 ml/dataset.py which detected events are real; unmarked events in
 pothole/hump sessions are ignored. For "normal" sessions marks are not
@@ -16,7 +16,7 @@ needed - every event on a normal road is a "normal" example.
 
 Output (data/raw/<label>/<YYYYmmdd_HHMMSS>.*):
     .csv       seq,x,y,z           every accelerometer sample (g, 100 Hz)
-    .marks     sample index of every ENTER press
+    .marks     sample index of every ENTER / BOOT-button press
     .gps.csv   seq,fix,lat,lon,speed_kmh,sats,hdop   (1 Hz)
 """
 
@@ -76,23 +76,27 @@ def main():
     last_seq = [0]
     stop = threading.Event()
 
+    def add_mark(seq, source):
+        marks.append(seq)
+        print(f"  >>> MARK #{len(marks)} ({source}) at sample {seq}", flush=True)
+
     def keyboard():
         while not stop.is_set():
             try:
-                sys.stdin.readline()
+                line = sys.stdin.readline()
             except (EOFError, ValueError):
                 return
-            if stop.is_set():
+            if stop.is_set() or line == "":     # EOF: stdin not a terminal
                 return
-            marks.append(last_seq[0])
-            print(f"  >>> MARK #{len(marks)} at sample {last_seq[0]}")
+            add_mark(last_seq[0], "ENTER")
 
     threading.Thread(target=keyboard, daemon=True).start()
 
     print()
     print(f"RECORDING '{args.label}' -> {os.path.relpath(base, ROOT)}.csv")
     if args.label != "normal":
-        print(f"Press ENTER every time you go over a {args.label.replace('_', ' ')}.")
+        print(f"Press ENTER (or the ESP32's BOOT button) every time you go over a "
+              f"{args.label.replace('_', ' ')}.")
     print("Ctrl+C to stop.\n")
 
     n_samples = 0
@@ -145,7 +149,13 @@ def main():
                 elif line.startswith("E,"):
                     p = line.split(",")
                     n_events += 1
-                    print(f"  event #{n_events} at sample {p[1]}: device model says {p[2]} ({p[3]})")
+                    print(f"  event #{n_events} at sample {p[1]}: device model says {p[2]} ({p[3]})", flush=True)
+
+                elif line.startswith("M,"):
+                    try:
+                        add_mark(int(line.split(",")[1]), "BOOT button")
+                    except (IndexError, ValueError):
+                        pass
 
                 elif line.startswith("W,"):
                     print("  ESP32 warning:", line[2:])

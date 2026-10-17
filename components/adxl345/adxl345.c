@@ -46,22 +46,28 @@ esp_err_t adxl345_init(int i2c_port, int sda, int scl)
         .flags.enable_internal_pullup = true,
     };
 
-    esp_err_t ret = i2c_new_master_bus(&bus_config, &bus_handle);
-    if (ret != ESP_OK)
-    {
-        return ret;
-    }
+    esp_err_t ret;
 
-    i2c_device_config_t device_config = {
-        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
-        .device_address = ADXL345_ADDR,
-        .scl_speed_hz = 400000,
-    };
-
-    ret = i2c_master_bus_add_device(bus_handle, &device_config, &dev_handle);
-    if (ret != ESP_OK)
+    /* bus + device are created once; later calls just re-probe the sensor */
+    if (bus_handle == NULL)
     {
-        return ret;
+        ret = i2c_new_master_bus(&bus_config, &bus_handle);
+        if (ret != ESP_OK)
+        {
+            return ret;
+        }
+
+        i2c_device_config_t device_config = {
+            .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+            .device_address = ADXL345_ADDR,
+            .scl_speed_hz = 400000,
+        };
+
+        ret = i2c_master_bus_add_device(bus_handle, &device_config, &dev_handle);
+        if (ret != ESP_OK)
+        {
+            return ret;
+        }
     }
 
     uint8_t devid = 0;

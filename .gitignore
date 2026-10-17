@@ -23,4 +23,5 @@ ml/_native/
 # Local data that should stay local
 data/raw/*.local.csv
 data/synthetic/
-sdkconfig.pre-refactor
+# bench (hand-motion) recordings are kept local; see docs/03-data-collection.md
+data/bench/

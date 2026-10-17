@@ -46,7 +46,6 @@ cloud/               AWS SAM backend (Lambda, DynamoDB, IoT rule, HTTP API, map)
 model/report.md      latest training report
 data/raw/            your recordings (data/legacy/ = old, unusable v1/v2 data)
 docs/                documentation
-legacy/              v1 scripts kept for reference
 ```
 
 ## Tests

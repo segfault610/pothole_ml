@@ -21,6 +21,7 @@
  *   RX                        GPIO17 (UART2 TX)
  *
  *   Status LED                GPIO2 (on-board blue LED)
+ *   Mark button               GPIO0 (on-board BOOT button, collector only)
  */
 
 #ifndef BOARD_PINS_H
@@ -36,5 +37,6 @@
 #define BOARD_GPS_BAUD      9600    /* NEO-7M factory default */
 
 #define BOARD_LED           2
+#define BOARD_MARK_BUTTON   0       /* BOOT button, read after boot only */
 
 #endif

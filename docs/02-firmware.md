@@ -24,9 +24,10 @@ Tested with ESP-IDF **v6.1** (also expected to work on v5.3+).
 . ~/esp-idf/export.sh            # or wherever your ESP-IDF lives
 ```
 
-The old checked-in `sdkconfig` files were moved to `sdkconfig.pre-refactor`
-(git-ignored). Each project now has a small `sdkconfig.defaults` and a fresh
-`sdkconfig` is generated on the first build. Notable defaults:
+Each project has a small `sdkconfig.defaults`; `sdkconfig` and `build/` are
+generated on the first build (both git-ignored). If you move the project
+folder, delete `build/` (or `idf.py fullclean`) — CMake refuses a build
+directory configured for another path. Notable defaults:
 
 - `CONFIG_FREERTOS_HZ=1000`
 - `esp32_iot`: `CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y` (the app is ~0.95 MB; the default 1 MB partition was 91 % full)

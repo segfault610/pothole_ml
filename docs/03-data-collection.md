@@ -37,7 +37,7 @@ Press ENTER every time you go over a pothole.
        50 s  samples=5000  events=3  marks=1  lost=0  | GPS 12.97163,79.15881 23.4 km/h sats=9
 ```
 
-**The passenger presses ENTER right after each pothole / hump.** That
+**The passenger presses ENTER (or the ESP32's BOOT button) right after each pothole / hump.** That
 "mark" is how the trainer knows which detected events are real. Unmarked
 events in a pothole or hump session are ignored (they were probably a
 rough patch). Late presses are fine — anything within 1 s before to 2 s
@@ -89,16 +89,31 @@ let you retrain whenever the features change. `data/legacy/` holds the old
 v1/v2 recordings; they are **not** used (wrong timing, see
 [04-ml-pipeline.md](04-ml-pipeline.md)).
 
-## Bench testing without a car
+## Bench sessions (no car) — rehearse the workflow
 
-You can sanity-check everything on a desk with the simulator:
+Hand motion is not a car, so bench data goes to `data/bench/`, **not**
+`data/raw/`, and is never mixed into the road model. It is useful for
+checking the wiring, the detector, marks and training end-to-end, and for a
+desk demo. Hold the breadboard flat, sensor mounted firmly on it, and keep
+it at the same angle throughout.
+
+| Session | Command | What to do |
+|---|---|---|
+| normal (2 min) | `python ml/collect.py --label normal --out data/bench --minutes 2` | "cruising": slow, gentle up-down sway (1–2 Hz, 1–2 cm) like a car body; every ~10 s a light knock on the table (road joint) or 2 s of fine jitter (rough patch). No button presses. |
+| speed hump (≈2 min, 20×) | `python ml/collect.py --label speed_hump --out data/bench --minutes 2` | every ~5 s: smooth **lift** 5–8 cm over ~0.4 s, come back down over ~0.4 s, small settle bounce. Press **BOOT** right after. |
+| pothole (≈2 min, 20×) | `python ml/collect.py --label pothole --out data/bench --minutes 2` | every ~5 s: quick small **drop** (2–3 cm, ~0.1 s), then a sharp **jolt up** (tap the board's edge on the table), settle. Press **BOOT** right after. |
+
+Then `python ml/train.py --data data/bench --header /tmp/bench_model.h`
+to see how separable your motions are, without overwriting the firmware's model.
+
+## Simulator
+
+The simulator produces car-like data without any hardware:
 
 ```bash
 python ml/simulate.py --out data/synthetic --sessions 8 --segments 40
 python ml/train.py --data data/synthetic
 ```
 
-Shaking the sensor by hand will trigger events, but hand motion does not
-look like a car — don't train on it.
 
 Next: [04-ml-pipeline.md](04-ml-pipeline.md) → `python ml/train.py`.
