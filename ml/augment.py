@@ -152,7 +152,7 @@ def write_session(path, samples, marks):
         f.write("".join(f"{m}\n" for m in marks))
 
 
-def build_session(label, real, bg, scale, rng):
+def build_session(label, real, bg, scale, rng, real_is_mirrored=False):
     rot = random_rotation(rng, 60)
     g = rot @ np.array([0.0, 0.0, rng.uniform(0.98, 1.06)])
     u = unit(g)
@@ -170,9 +170,12 @@ def build_session(label, real, bg, scale, rng):
     pos += len(lead)
 
     for _ in range(EVENTS_PER_SESSION):
-        use_real = real and (label != "pothole") and rng.random() < 0.7
+        use_real = real and rng.random() < 0.7
         if use_real:
             dyn, u_src = augment_real(real[rng.integers(len(real))], rng)
+            if label == "pothole" and real_is_mirrored:
+                # a recorded lift-then-down, flipped vertically = drop-then-lift
+                dyn = dyn - 2 * np.outer(dyn @ u_src, u_src)
             # rotate the recorded event so its gravity matches this session's
             v = np.cross(u_src, u)
             c = float(u_src @ u)
@@ -207,7 +210,22 @@ def main():
 
     rng = np.random.default_rng(args.seed)
     _, y, _, events = dataset.build([args.src], verbose=False)
-    by_label = {c: [e for e in events if e["label"] == c] for c in dataset.LABELS}
+
+    def first_peak(e):
+        return re.features(e["window"], e["g"])[re.FEATURE_NAMES.index("first_peak")]
+
+    # keep only events with the defining shape (unmarked sessions contain
+    # failed attempts): humps lift first, potholes drop first
+    by_label = {
+        "normal": [e for e in events if e["label"] == "normal"],
+        "speed_hump": [e for e in events if e["label"] == "speed_hump" and first_peak(e) > 0],
+        "pothole": [e for e in events if e["label"] == "pothole" and first_peak(e) < 0],
+    }
+    mirrored = {"pothole": False}
+    if len(by_label["pothole"]) < 20 and by_label["speed_hump"]:
+        # no real potholes: use the real humps mirrored (drop first, then lift)
+        by_label["pothole"] = by_label["speed_hump"]
+        mirrored["pothole"] = True
     bg = background_pool(args.src)
 
     real_p2p = [re.features(e["window"], e["g"])[2] for e in events]
@@ -219,10 +237,11 @@ def main():
         os.makedirs(folder, exist_ok=True)
         n_sessions = int(np.ceil(args.per_class / EVENTS_PER_SESSION))
         for i in range(n_sessions):
-            acc, marks = build_session(label, by_label[label], bg, scale, rng)
+            acc, marks = build_session(label, by_label[label], bg, scale, rng,
+                                       real_is_mirrored=mirrored.get(label, False))
             write_session(os.path.join(folder, f"aug_{label}_{i:02d}"), acc, marks)
         print(f"  {label:10s} {n_sessions} sessions x {EVENTS_PER_SESSION} events "
-              f"({'real-based' if by_label[label] and label != 'pothole' else 'parametric'})")
+              f"({'mirrored real humps + parametric' if mirrored.get(label) else 'real-based + parametric' if by_label[label] else 'parametric'})")
 
 
 if __name__ == "__main__":
