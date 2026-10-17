@@ -102,6 +102,24 @@ These numbers say the pipeline works; they do **not** predict real-road
 accuracy. Retrain on real drives ([03-data-collection.md](03-data-collection.md))
 and read `model/report.md`.
 
+### Growing a small dataset (`ml/augment.py`)
+
+```bash
+python ml/augment.py --src data/bench --out data/bench_aug --per-class 300
+python ml/train.py --data data/synthetic data/bench_aug data/bench
+```
+
+Real events are re-used with random rotation, amplitude scaling (0.7–1.35×),
+time stretch (0.85–1.2×) and fresh noise, embedded in real background
+signal; classes without enough real examples are filled with parametric
+events (pothole: drop → sharp jolt → ringing; hump: smooth lift → down;
+normal: knocks, double knocks, shaking bursts) sized to the recorded
+motions. The current firmware model was trained this way (car simulator +
+augmented bench + 144 real bench events): session-grouped CV macro-F1 0.90;
+trained without the real recordings it classifies them with 95 % accuracy
+(the augmented data derives from those events, so this is not a fully
+independent test, and potholes have no clean real recordings yet).
+
 ### Tuning
 
 | Knob | Where | Effect |

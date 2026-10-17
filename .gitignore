@@ -25,3 +25,4 @@ data/raw/*.local.csv
 data/synthetic/
 # bench (hand-motion) recordings are kept local; see docs/03-data-collection.md
 data/bench/
+data/bench_aug/

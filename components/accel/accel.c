@@ -65,7 +65,7 @@ esp_err_t accel_init(int i2c_port, int sda, int scl)
         if (ret == ESP_OK)
         {
             active = BACKENDS[i];
-            ESP_LOGI(TAG, "using %s: %d Hz, +/-8 g, FIFO", active->name, ACCEL_RATE_HZ);
+            ESP_LOGI(TAG, "using %s: %d Hz, +/-8 g", active->name, ACCEL_RATE_HZ);
             return ESP_OK;
         }
 

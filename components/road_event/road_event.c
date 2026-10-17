@@ -90,7 +90,13 @@ int road_event_push(re_detector_t *d, float x, float y, float z)
      */
     float alpha = RE_GRAVITY_ALPHA;
 
-    if (fabsf(v) > RE_TRIGGER_G || d->remaining > 0)
+    if (d->seq < RE_WARMUP)
+    {
+        /* converge fast from any start value (e.g. an MPU-6050 that
+         * returns 0 g for its first sample after reset) */
+        alpha = 0.05f;
+    }
+    else if (fabsf(v) > RE_TRIGGER_G || d->remaining > 0)
     {
         alpha *= 0.1f;
     }
