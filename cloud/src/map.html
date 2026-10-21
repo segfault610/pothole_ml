@@ -70,6 +70,9 @@
       };
       layer.clearLayers();
       const pts = [];
+      // potholes last so they are drawn on top of nearby speed humps
+      data.features.sort((a, b) =>
+        (a.properties.event === "POTHOLE") - (b.properties.event === "POTHOLE"));
       for (const f of data.features) {
         if (!show[f.properties.event]) continue;
         const [lon, lat] = f.geometry.coordinates;
@@ -78,7 +81,7 @@
         m.addTo(layer);
         pts.push([lat, lon]);
       }
-      if (!fitted && pts.length) { map.fitBounds(pts, { maxZoom: 16, padding: [40, 40] }); fitted = true; }
+      if (!fitted && pts.length) { map.fitBounds(pts, { maxZoom: 18, padding: [40, 40] }); fitted = true; }
       document.getElementById("status").textContent =
         `${pts.length} marker(s) · updated ${new Date().toLocaleTimeString()}`;
     } catch (e) {

@@ -43,6 +43,19 @@ Everything is in [`cloud/`](../cloud):
 - `GET /potholes?type=POTHOLE&min_reports=2` filters; the map has the same
   controls and refreshes every 30 s.
 
+> **Deployed 2026-10-22** — the actual deployment log, resource list and
+> verification are in [08-aws-deployment.md](08-aws-deployment.md).
+
+## Register the device in your account
+
+```bash
+cloud/provision_device.sh ap-south-1 pothole-esp32
+```
+
+Creates the IoT thing, an active certificate (`esp32_iot/certs/`), the
+publish-only policy, and writes your account's endpoint into
+`esp32_iot/main/secrets.h`. Then rebuild and flash `esp32_iot`.
+
 ## Deploy with AWS SAM (recommended, ~10 minutes)
 
 Prerequisites: an AWS account (the one with your IoT thing), the region you
@@ -80,7 +93,7 @@ topic `pothole/alerts`, payload:
  "gps":{"fix":true,"sats":8,"hdop":1.0,"speed_kmh":25}}
 ```
 
-or from a terminal:
+or from a terminal (AWS CLI v2; on v1, as installed by `pip install awscli`, drop `--cli-binary-format raw-in-base64-out`):
 
 ```bash
 aws iot-data publish --region ap-south-1 --topic pothole/alerts \

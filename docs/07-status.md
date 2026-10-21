@@ -1,6 +1,6 @@
 # 7. Project status
 
-*Last updated: 2026-10-17*
+*Last updated: 2026-10-22*
 
 ## Where things stand
 
@@ -11,8 +11,8 @@
 | Firmware | ✅ `esp32_iot` flashed: continuous detection → classification → MQTT to AWS IoT with real GPS coordinates; no false events at rest |
 | Model | ⚠️ `forest_n10_d8` (10 trees, ~17 KB). Works on desk motions; **not yet validated on a road**; potholes are synthetic |
 | Data collection | ✅ guided mode (`ml/collect.py --guided`) works after two bug fixes |
-| Cloud: MQTT ingest | ✅ device publishes to `pothole/alerts` |
-| Cloud: storage + map | ⏳ code in `cloud/` is written and tested offline; **not deployed yet** (needs AWS credentials, see [05-cloud-gis.md](05-cloud-gis.md)) |
+| Cloud: MQTT ingest | ✅ device publishes to `pothole/alerts` on the project's own AWS account (ap-south-1), provisioned with `cloud/provision_device.sh` |
+| Cloud: storage + map | ✅ **deployed** 2026-10-22 (SAM stack `pothole-map`); real pothole and hump reports from the board appear on the live map — see [08-aws-deployment.md](08-aws-deployment.md) |
 | Security | ⚠️ Wi-Fi password from the first commit is still in the public history — change it ([06-security.md](06-security.md)) |
 
 ## The deployed model
@@ -55,14 +55,14 @@ Kept here so the same traps are not hit again.
 | MPU-6050 FIFO desynchronised | a whole session of random ±8 g values; model learnt "noise = pothole" | read each sample on DATA_RDY instead of the byte FIFO; live warning in `collect.py`; `dataset.py` drops implausible events (`e58f811`) |
 | MPU-6050 returns 0 g as its first sample after reset | a false SPEED_HUMP every 1.3 s at rest (~20 were published to AWS before the fix) | fast gravity convergence during warm-up (`991a709`) |
 | Pothole never predicted on the device | drop-then-lift → SPEED HUMP | 35 % of hump labels were drop-first failed attempts; cleaned, and potholes now built from mirrored real humps (`97b96fc`) |
+| Board still on a previous account (2026-10-22) | `Wi-Fi disconnected`, `couldn't get hostname for ...ap-southeast-2...` | new certs/endpoint via `cloud/provision_device.sh`, new `secrets.h` |
+| Potholes "missing" on the map (2026-10-22) | only hump markers visible | desk events are metres apart; hump marker covered the pothole one — `map.html` draws potholes on top |
 | `idf.py flash` failing | "Could not open /dev/ttyUSB0, the port is busy" | close `idf.py monitor` (Ctrl+]) or any other serial program first |
 
 ## Next steps
 
-1. **Deploy the cloud backend** — `aws configure` (region ap-south-1), then
-   `cd cloud && sam build && sam deploy --guided`; open the `MapUrl` output.
-   The ~20 false alerts sent earlier are not in the database (the rule only
-   processes new messages).
+1. ~~Deploy the cloud backend~~ — done 2026-10-22 ([08-aws-deployment.md](08-aws-deployment.md)).
+   Replace the root access key used for it with an IAM user key.
 2. **Road data** — a few guided/free sessions in a car, then retrain on
    `data/raw` (+ synthetic) and drop the bench data from the road model.
 3. **Rotate the leaked Wi-Fi password.**

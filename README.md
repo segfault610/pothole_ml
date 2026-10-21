@@ -19,14 +19,17 @@ NEO-7M ─UART─┘   (position at the moment of impact)
 | Check it | `cd esp32_inference && idf.py -p /dev/ttyUSB0 flash monitor` | [firmware](docs/02-firmware.md) |
 | Record drives | flash `esp32_collector`, then `python ml/collect.py --label pothole` | [data collection](docs/03-data-collection.md) |
 | Train | `python ml/train.py` → writes `components/pothole_model/include/pothole_model.h` | [ML pipeline](docs/04-ml-pipeline.md) |
-| Deploy | `cp esp32_iot/main/secrets.example.h esp32_iot/main/secrets.h`, add certs, flash `esp32_iot` | [firmware](docs/02-firmware.md) |
+| Deploy | `cp esp32_iot/main/secrets.example.h esp32_iot/main/secrets.h` (Wi-Fi), `cloud/provision_device.sh` (certs + endpoint), flash `esp32_iot` | [firmware](docs/02-firmware.md), [AWS](docs/08-aws-deployment.md) |
 | Map | `cd cloud && sam build && sam deploy --guided` | [cloud & GIS](docs/05-cloud-gis.md) |
 
-> **Status (2026-10-17):** hardware + firmware + MQTT publishing with real GPS
-> work end-to-end on an MPU-6050 (GY-521). The model (`forest_n10_d8`) is
-> trained on simulated + augmented desk recordings and recognises pothole /
-> speed hump / normal desk motions; it is not yet validated on a road. The
-> map backend is written but not deployed. Details: [docs/07-status.md](docs/07-status.md).
+> **Status (2026-10-22):** the whole chain works end-to-end, from sensor to AWS
+> IoT Core to Lambda/DynamoDB to the live web map, on an MPU-6050 (GY-521) with real GPS. The
+> model (`forest_n10_d8`) is trained on simulated + augmented desk recordings
+> and recognises pothole / speed hump / normal desk motions; it is not yet
+> validated on a road. Full write-up: [docs/09-project-report.md](docs/09-project-report.md) ·
+> AWS deployment: [docs/08-aws-deployment.md](docs/08-aws-deployment.md) ·
+> slides: [docs/Pothole_Detection_System.pptx](docs/Pothole_Detection_System.pptx) ·
+> capstone report / IEEE paper: [docs/report/](docs/report/) · commands: [docs/10-commands-and-links.md](docs/10-commands-and-links.md).
 
 > **Security:** the Wi-Fi password from the first commit is public in the
 > history — change it. See [docs/06-security.md](docs/06-security.md).
@@ -44,7 +47,7 @@ esp32_collector/     firmware: stream raw data for training
 esp32_inference/     firmware: offline bench test
 esp32_iot/           firmware: detection + GPS + AWS IoT MQTT
 ml/                  collect.py (guided), review.py, dataset.py, augment.py, train.py, simulate.py, tests/
-cloud/               AWS SAM backend (Lambda, DynamoDB, IoT rule, HTTP API, map)
+cloud/               AWS SAM backend (Lambda, DynamoDB, IoT rule, HTTP API, map) + provision_device.sh
 model/report.md      latest training report
 data/raw/            road recordings · data/bench/ desk recordings (GPS logs not committed)
                      data/legacy/ = old, unusable v1/v2 data
