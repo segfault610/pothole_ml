@@ -15,7 +15,6 @@
  *   gps      (component) parses NMEA in the background
  *
  * Wi-Fi credentials and the AWS endpoint live in secrets.h (git-ignored).
- * Copy secrets.example.h to secrets.h and fill it in.
  */
 
 #include <stdio.h>
